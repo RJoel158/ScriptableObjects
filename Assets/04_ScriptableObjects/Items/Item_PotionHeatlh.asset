@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e88230455e480a943b6e045d608153e0, type: 3}
+  m_Name: Item_PotionHeatlh
+  m_EditorClassIdentifier: Assembly-CSharp::PotionData
+  id: potion_health_01
+  itemName: Poci\xF3n de Salud
+  itemDescription: Restaura 40 puntos de vida de forma instant\xE1nea.
+  itemIcon: {fileID: 21300000, guid: 676d6779c8c04164b82b50c4ff163066, type: 3}
+  itemType: 2
+  rarity: 0
+  itemPrice: 25
+  sellPrice: 12
+  itemStackSize: 20
+  itemPrefab: {fileID: 0}
+  potionType: 0
+  healthRestoreAmount: 40
+  buffDuration: 0.0
+  buffMultiplier: 1.0

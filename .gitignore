@@ -1,0 +1,85 @@
+# =========================================================================
+# Unity .gitignore Estándar Completo y Recomendado
+# =========================================================================
+
+# Carpetas generadas automáticamente por Unity
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Asset server cache
+/[Aa]sset_Server_Cache/
+
+# Archivos de caché y configuración temporal del Editor
+*.pid
+*.pidb
+*.unityproj
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity3D Generated File On Crash Reports
+sysinfo.txt
+
+# Compilaciones y builds generados
+*.apk
+*.aab
+*.unitypackage
+*.app
+*.exe
+*.zip
+*.7z
+
+# Visual Studio & Visual Studio Code & Rider
+.vs/
+.idea/
+.vscode/
+ExportedObj/
+.consulo/
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.opendb
+*.VC.db
+
+# Unity Profiler / Crash reports
+*.crash
+*.dmp
+*.nvprof
+
+# Archivos del sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Unity Plastic SCM / Version Control temporal
+.plastic/
+.collab/
+
+# Cache de paquetes locales
+/Packages/manifest.json.lock
+/Packages/packages-lock.json
