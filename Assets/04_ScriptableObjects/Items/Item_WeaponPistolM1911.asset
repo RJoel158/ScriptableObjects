@@ -24,15 +24,15 @@ MonoBehaviour:
   itemStackSize: 1
   itemPrefab: {fileID: 0}
   weaponCategory: 0
-  damage: 25
+  damage: 10
   attackSpeed: 3.5
   projectileSpeed: 40
   attackRange: 50
   isRanged: 1
   usesAmmo: 1
   magazineCapacity: 12
-  maxReserveAmmo: 120
-  reloadDuration: 3.0
+  maxReserveAmmo: 60
+  reloadDuration: 3
   animatorOverride: {fileID: 0}
   weaponModelPrefab: {fileID: 1694449805434718, guid: 6f1a7354265853f44b0ed5e2e43676ad, type: 3}
   projectilePrefab: {fileID: 4898316266633158667, guid: 5e41895faea6de643a5c588e30d7a346, type: 3}

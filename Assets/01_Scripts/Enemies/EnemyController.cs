@@ -23,12 +23,14 @@ public class EnemyController : MonoBehaviour, IDamageable
     private float nextAttackTime = 0f;
     private bool isDead = false;
     private bool isCrawling = false;
+    private bool isCrawlingFast = false;
     private bool isScreaming = false;
     private Renderer[] enemyRenderers;
     private Color originalColor;
 
     public bool IsDead => isDead;
     public bool IsCrawling => isCrawling;
+    public bool IsCrawlingFast => isCrawlingFast;
     public int CurrentHealth => currentHealth;
     public int MaxHealth => maxHealth;
 
@@ -36,6 +38,7 @@ public class EnemyController : MonoBehaviour, IDamageable
     private static readonly int SpeedHash = Animator.StringToHash("Speed");
     private static readonly int IsMovingHash = Animator.StringToHash("isMoving");
     private static readonly int IsCrawlingHash = Animator.StringToHash("isCrawling");
+    private static readonly int IsCrawlingFastHash = Animator.StringToHash("isCrawlingFast");
     private static readonly int AttackHash = Animator.StringToHash("Attack");
     private static readonly int BiteHash = Animator.StringToHash("Bite");
     private static readonly int ScreamHash = Animator.StringToHash("Scream");
@@ -216,6 +219,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         animator.SetFloat(SpeedHash, speed);
         animator.SetBool(IsMovingHash, speed > 0.1f);
         animator.SetBool(IsCrawlingHash, isCrawling);
+        animator.SetBool(IsCrawlingFastHash, isCrawlingFast);
     }
 
     private void TryAttackPlayer()
@@ -224,8 +228,10 @@ public class EnemyController : MonoBehaviour, IDamageable
 
         nextAttackTime = Time.time + attackCooldown;
 
-        // 25% de probabilidad de realizar mordida especial en el cuello con Aturdimiento
-        bool isNeckBite = Random.value < 0.25f && !isCrawling;
+        // Si está en Running Crawl (a 4 patas enfurecido), el ataque es 100% forcejeo/stun (Neck Bite QTE)
+        // Si es zombie bípedo estándar, tiene 25% de probabilidad de morder el cuello
+        // Si es crawler lento lisiado por tiro en pierna, realiza zarpazo bajo normal
+        bool isNeckBite = isCrawlingFast || (!isCrawling && Random.value < 0.25f);
 
         if (HasValidAnimator)
         {
@@ -251,7 +257,7 @@ public class EnemyController : MonoBehaviour, IDamageable
             {
                 // Iniciar forcejeo interactivo QTE donde el jugador debe spamear Espacio
                 playerController.StartGrappleQTE(this, 2.5f);
-                Debug.Log($"[Enemigo] ¡{enemyData?.enemyName ?? name} mordió el cuello del jugador e inició forcejeo QTE!");
+                Debug.Log($"[Enemigo] ¡{enemyData?.enemyName ?? name} atrapó al jugador en forcejeo QTE!");
             }
             else
             {
@@ -327,6 +333,7 @@ public class EnemyController : MonoBehaviour, IDamageable
     {
         if (isCrawling) yield break;
         isCrawling = true;
+        isCrawlingFast = isFast;
 
         // Ajustar el CharacterController al suelo para el gateo
         CharacterController cc = GetComponent<CharacterController>();
@@ -346,6 +353,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         if (HasValidAnimator)
         {
             animator.SetBool(IsCrawlingHash, true);
+            animator.SetBool(IsCrawlingFastHash, isFast);
             string stateName = isFast ? "Zombie_CrawlFast" : "Zombie_CrawlSlow";
             animator.CrossFade(stateName, 0.12f, 0, 0f);
         }
