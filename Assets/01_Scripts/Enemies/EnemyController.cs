@@ -291,15 +291,17 @@ public class EnemyController : MonoBehaviour, IDamageable
             hud.TriggerHitmarker(false);
         }
 
-        // Si el disparo impacta en las piernas, el zombie tropieza y pasa a modo Crawler
+        // Si el disparo impacta en las piernas, el zombie tropieza y pasa a modo Crawler Lento
         if (isLegShot && !isCrawling)
         {
-            StartCoroutine(TriggerCrawlMode());
-            if (hud != null) hud.ShowNotification("¡Tiro en la pierna! El zombie cae y repta");
+            StartCoroutine(TriggerCrawlMode(isFast: false));
+            if (hud != null) hud.ShowNotification("¡Tiro en la pierna! El zombie cae y se arrastra");
         }
-        else if (!isCrawling && (currentHealth - finalDamage <= maxHealth * 0.4f || Random.value < 0.25f))
+        else if (!isCrawling && (currentHealth - finalDamage <= maxHealth * 0.35f || Random.value < 0.20f))
         {
-            StartCoroutine(TriggerCrawlMode());
+            // Gateo rápido y rabioso (Running Crawl) por furia de daño
+            StartCoroutine(TriggerCrawlMode(isFast: true));
+            if (hud != null) hud.ShowNotification("⚠️ ¡ZOMBIE ENFURECIDO A CUATRO PATAS!");
         }
 
         // Empuje físico hacia atrás (Knockback)
@@ -321,7 +323,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         }
     }
 
-    private IEnumerator TriggerCrawlMode()
+    private IEnumerator TriggerCrawlMode(bool isFast = false)
     {
         if (isCrawling) yield break;
         isCrawling = true;
@@ -344,13 +346,23 @@ public class EnemyController : MonoBehaviour, IDamageable
         if (HasValidAnimator)
         {
             animator.SetBool(IsCrawlingHash, true);
-            animator.CrossFade("Zombie_Crawl", 0.12f, 0, 0f);
+            string stateName = isFast ? "Zombie_CrawlFast" : "Zombie_CrawlSlow";
+            animator.CrossFade(stateName, 0.12f, 0, 0f);
         }
 
-        // Aumentar velocidad y agresividad del zombie que repta por el piso
-        currentMoveSpeed = Mathf.Max(currentMoveSpeed * 1.5f, 2.8f);
-        currentDamage += 5;
-        attackRange = 1.0f;
+        if (isFast)
+        {
+            // Modo Crawler Rápido (Running Crawl)
+            currentMoveSpeed = Mathf.Max(currentMoveSpeed * 1.5f, 3.2f);
+            currentDamage += 5;
+            attackRange = 1.1f;
+        }
+        else
+        {
+            // Modo Crawler Lento (Tiro en la pierna / arrastre agonizante)
+            currentMoveSpeed = Mathf.Min(currentMoveSpeed * 0.65f, 1.3f);
+            attackRange = 0.9f;
+        }
 
         yield return null;
     }
