@@ -113,8 +113,11 @@ public class PlayerController : MonoBehaviour
         CanMove = true;
     }
 
+    public static PlayerController Instance { get; private set; }
+
     void Awake()
     {
+        if (Instance == null) Instance = this;
         characterController = GetComponent<CharacterController>();
         mainCamera = Camera.main;
         if (animator == null) animator = GetComponentInChildren<Animator>();

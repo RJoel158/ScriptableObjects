@@ -15,7 +15,18 @@ public class MutantBossController : EnemyController
     [SerializeField] private BossPhase currentPhase = BossPhase.Phase1_MeleeAssault;
     [SerializeField] private float jumpAttackCooldown = 7.5f;
     [SerializeField] private float spikeAttackCooldown = 3.5f;
-    [SerializeField] private Transform spikeLaunchPoint;
+
+    [Header("Spike Launch Points (Big Spikes & Arms)")]
+    [Tooltip("Punto de origen de la espina gigante izquierda")]
+    [SerializeField] private Transform leftBigSpike;
+    [Tooltip("Punto de origen de la espina gigante derecha")]
+    [SerializeField] private Transform rightBigSpike;
+    [Tooltip("Punto de origen de la mano/brazo izquierdo")]
+    [SerializeField] private Transform leftHandSpike;
+    [Tooltip("Punto de origen de la mano/brazo derecho")]
+    [SerializeField] private Transform rightHandSpike;
+    [Tooltip("Todos los puntos de espinas detectados en el modelo")]
+    [SerializeField] private List<Transform> allSpikePoints = new List<Transform>();
 
     private bool isPerformingSpecialAction = false;
     private float nextJumpTime = 0f;
@@ -33,10 +44,64 @@ public class MutantBossController : EnemyController
 
     public BossPhase CurrentPhase => currentPhase;
 
+    [ContextMenu("⚙️ Auto-Vincular Puntos de Espinas y Animator")]
+    public void AutoBindComponentsAndSpikePoints()
+    {
+        if (animator == null) animator = GetComponentInChildren<Animator>(true);
+        if (animator == null) animator = GetComponent<Animator>();
+
+        Transform[] allChildren = GetComponentsInChildren<Transform>(true);
+        allSpikePoints.Clear();
+
+        foreach (var t in allChildren)
+        {
+            string n = t.name.ToLower();
+            if (leftBigSpike == null && (n.Contains("left_big_spike4") || n.Contains("left_big_spike3") || n.Contains("left_big_spike") || n.Contains("lspike") || n.Contains("spike_l")))
+            {
+                leftBigSpike = t;
+            }
+            if (rightBigSpike == null && (n.Contains("right_big_spike4") || n.Contains("right_big_spike3") || n.Contains("right_big_spike") || n.Contains("rspike") || n.Contains("spike_r")))
+            {
+                rightBigSpike = t;
+            }
+            if (leftHandSpike == null && (n.Contains("left_hand") || n.Contains("hand_l") || n.Contains("left_forearm")))
+            {
+                leftHandSpike = t;
+            }
+            if (rightHandSpike == null && (n.Contains("right_hand") || n.Contains("hand_r") || n.Contains("right_forearm")))
+            {
+                rightHandSpike = t;
+            }
+
+            if (n.Contains("big_spike") || n.Contains("small_spike") || n.Contains("spike"))
+            {
+                if (!allSpikePoints.Contains(t)) allSpikePoints.Add(t);
+            }
+        }
+
+        if (leftBigSpike != null && !allSpikePoints.Contains(leftBigSpike)) allSpikePoints.Add(leftBigSpike);
+        if (rightBigSpike != null && !allSpikePoints.Contains(rightBigSpike)) allSpikePoints.Add(rightBigSpike);
+        if (leftHandSpike != null && !allSpikePoints.Contains(leftHandSpike)) allSpikePoints.Add(leftHandSpike);
+        if (rightHandSpike != null && !allSpikePoints.Contains(rightHandSpike)) allSpikePoints.Add(rightHandSpike);
+    }
+
+    protected override void OnValidate()
+    {
+        base.OnValidate();
+        if (leftBigSpike == null || rightBigSpike == null || animator == null)
+        {
+            AutoBindComponentsAndSpikePoints();
+        }
+    }
+
     protected override void Awake()
     {
         base.Awake();
         heightOffset = (enemyData != null && enemyData.groundYOffset > 0f) ? enemyData.groundYOffset : 0.65f;
+        if (leftBigSpike == null || rightBigSpike == null || animator == null)
+        {
+            AutoBindComponentsAndSpikePoints();
+        }
     }
 
     protected override void Start()
@@ -73,10 +138,12 @@ public class MutantBossController : EnemyController
 
         if (targetPlayer == null)
         {
-            PlayerController player = FindAnyObjectByType<PlayerController>();
-            if (player != null) targetPlayer = player.transform;
-            UpdateAnimation(0f);
-            return;
+            AutoAssignPlayerTarget();
+            if (targetPlayer == null)
+            {
+                UpdateAnimation(0f);
+                return;
+            }
         }
 
         // Mantener altura sobre el suelo
@@ -269,10 +336,10 @@ public class MutantBossController : EnemyController
             }
         }
 
-        // Si está en fase berserker, lanzar Nova de espinas 360°
+        // Si está en fase berserker, lanzar Nova de espinas 360° desde las Big Spikes
         if (novaSpikes)
         {
-            FireSpikeNova(10, Mathf.RoundToInt(currentDamage * 0.9f));
+            FireSpikeNova(12, Mathf.RoundToInt(currentDamage * 0.9f));
         }
 
         yield return new WaitForSeconds(0.5f);
@@ -294,27 +361,44 @@ public class MutantBossController : EnemyController
 
         if (!isDead && targetPlayer != null)
         {
-            Vector3 spawnOrigin = spikeLaunchPoint != null 
-                ? spikeLaunchPoint.position 
-                : transform.position + transform.forward * 1.2f + Vector3.up * 1.8f;
+            Vector3 leftOrigin = GetLeftSpikeOrigin();
+            Vector3 rightOrigin = GetRightSpikeOrigin();
 
-            Vector3 baseDir = (targetPlayer.position + Vector3.up * 1.0f - spawnOrigin).normalized;
+            Vector3 baseDirLeft = (targetPlayer.position + Vector3.up * 1.0f - leftOrigin).normalized;
+            Vector3 baseDirRight = (targetPlayer.position + Vector3.up * 1.0f - rightOrigin).normalized;
 
             if (tripleSpread)
             {
-                // Ráfaga en abanico (Centro, Izquierda -15°, Derecha +15°)
-                FireSpike(spawnOrigin, baseDir);
-                FireSpike(spawnOrigin, Quaternion.Euler(0, -16, 0) * baseDir);
-                FireSpike(spawnOrigin, Quaternion.Euler(0, 16, 0) * baseDir);
+                // Disparo simultáneo desde la Big Spike Izquierda y Big Spike Derecha en cono
+                FireSpike(leftOrigin, baseDirLeft);
+                FireSpike(rightOrigin, baseDirRight);
+                FireSpike(leftOrigin, Quaternion.Euler(0, -18, 0) * baseDirLeft);
+                FireSpike(rightOrigin, Quaternion.Euler(0, 18, 0) * baseDirRight);
             }
             else
             {
-                FireSpike(spawnOrigin, baseDir);
+                // Alternar o disparar doble espina directa desde las dos Big Spikes
+                FireSpike(leftOrigin, baseDirLeft);
+                FireSpike(rightOrigin, baseDirRight);
             }
         }
 
         yield return new WaitForSeconds(0.45f);
         isPerformingSpecialAction = false;
+    }
+
+    private Vector3 GetLeftSpikeOrigin()
+    {
+        if (leftBigSpike != null) return leftBigSpike.position;
+        if (leftHandSpike != null) return leftHandSpike.position;
+        return transform.position + transform.forward * 1.1f - transform.right * 0.6f + Vector3.up * 1.9f;
+    }
+
+    private Vector3 GetRightSpikeOrigin()
+    {
+        if (rightBigSpike != null) return rightBigSpike.position;
+        if (rightHandSpike != null) return rightHandSpike.position;
+        return transform.position + transform.forward * 1.1f + transform.right * 0.6f + Vector3.up * 1.9f;
     }
 
     private void FireSpike(Vector3 origin, Vector3 direction)
@@ -328,14 +412,16 @@ public class MutantBossController : EnemyController
 
     private void FireSpikeNova(int count, int damage)
     {
-        Vector3 spawnOrigin = transform.position + Vector3.up * 1.3f;
+        Vector3 leftOrigin = GetLeftSpikeOrigin();
+        Vector3 rightOrigin = GetRightSpikeOrigin();
         float angleStep = 360f / count;
 
         for (int i = 0; i < count; i++)
         {
             float angle = i * angleStep;
             Vector3 dir = Quaternion.Euler(0, angle, 0) * Vector3.forward;
-            FireSpike(spawnOrigin, dir);
+            Vector3 origin = (i % 2 == 0) ? leftOrigin : rightOrigin;
+            FireSpike(origin, dir);
         }
     }
     #endregion

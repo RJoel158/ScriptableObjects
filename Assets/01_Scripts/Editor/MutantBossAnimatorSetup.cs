@@ -21,6 +21,47 @@ public static class MutantBossAnimatorSetup
     public static void ManualSetup()
     {
         SetupBossAnimator(true);
+        AutoBakeMutantBossPrefab(true);
+    }
+
+    [MenuItem("RPG Survival/⚙️ Pre-Vincular Puntos de Espinas y Animator en Prefab", false, 41)]
+    public static void ManualBakePrefab()
+    {
+        AutoBakeMutantBossPrefab(true);
+    }
+
+    public static void AutoBakeMutantBossPrefab(bool showDialog)
+    {
+        string prefabPath = "Assets/03_Prefabs/Base mesh MonsterMutant7 skin1.prefab";
+        GameObject prefabRoot = PrefabUtility.LoadPrefabContents(prefabPath);
+        if (prefabRoot == null)
+        {
+            if (showDialog) EditorUtility.DisplayDialog("Aviso", "No se encontró el prefab en " + prefabPath, "OK");
+            return;
+        }
+
+        MutantBossController bossCtrl = prefabRoot.GetComponent<MutantBossController>();
+        if (bossCtrl == null) bossCtrl = prefabRoot.AddComponent<MutantBossController>();
+
+        // Asignar ScriptableObject
+        EnemyData bossData = AssetDatabase.LoadAssetAtPath<EnemyData>("Assets/04_ScriptableObjects/Enemies/Enemy_MutantMonster.asset");
+
+        // Vincular Animator y Puntos de Espinas automáticamente
+        bossCtrl.AutoBindComponentsAndSpikePoints();
+
+        // Guardar prefab pre-horneado
+        PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
+        PrefabUtility.UnloadPrefabContents(prefabRoot);
+
+        if (showDialog)
+        {
+            EditorUtility.DisplayDialog("Prefab Pre-Configurado", 
+                "¡Prefab del Jefe Mutante pre-configurado exitosamente!\n\n" +
+                "• Animator vinculado.\n" +
+                "• Big Spikes (Púas Gigantes Izquierda y Derecha) y Brazos auto-asignados.\n" +
+                "• Cero búsqueda en tiempo de ejecución (0 Roaming).", 
+                "¡Excelente!");
+        }
     }
 
     public static void SetupBossAnimator(bool showDialog)

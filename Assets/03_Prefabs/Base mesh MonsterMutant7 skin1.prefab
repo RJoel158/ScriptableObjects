@@ -1815,7 +1815,15 @@ Animator:
   m_LinearVelocityBlending: 0
   m_StabilizeFeet: 0
   m_AnimatePhysics: 0
-  m_WarningMessage: 
+  m_WarningMessage: "\nBinding warning: Some generic clip(s) animate transforms that
+    are already bound by a Humanoid avatar. These transforms can only be changed
+    by Humanoid clips.\n\tTransform 'Character1_LeftShoulder'\n\tTransform 'Character1_RightShoulder'\n\tTransform
+    'Character1_LeftLeg'\n\tTransform 'Character1_Head'\n\tTransform 'Character1_Neck'\n\tTransform
+    'Character1_RightLeg'\n\tTransform 'Character1_Hips'\n\tTransform 'Character1_LeftForeArm'\n\tTransform
+    'Character1_Reference'\n\tTransform 'Character1_Spine2'\n\tand more ...\n\tFrom
+    animation clip 'idle1'\n\tFrom animation clip 'run1'\n\tFrom animation clip 'attack2'\n\tFrom
+    animation clip 'attack2RLSpike'\n\tFrom animation clip 'jump'\n\tFrom animation
+    clip 'rage'\n\tFrom animation clip 'gethit1'\n\tFrom animation clip 'death1'"
   m_HasTransformHierarchy: 1
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
@@ -1832,9 +1840,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 98e6350c5a3474f44bc06d61b0e6b090, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MutantBossController
-  bossData: {fileID: 11400000, guid: 1e56fc51f249426f8b291b700dfe27a5, type: 2}
+  enemyData: {fileID: 11400000, guid: 1e56fc51f249426f8b291b700dfe27a5, type: 2}
   targetPlayer: {fileID: 0}
-  groundYOffset: 0.65
+  heightOffset: 0
+  animator: {fileID: 0}
+  currentPhase: 0
+  jumpAttackCooldown: 7.5
+  spikeAttackCooldown: 3.5
+  spikeLaunchPoint: {fileID: 0}
 --- !u!1 &3490026887102114922
 GameObject:
   m_ObjectHideFlags: 0
@@ -1860,13 +1873,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3490026887102114922}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: 0.008829169, w: 0.999961}
   m_LocalPosition: {x: -0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 3490026887102542096}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 1.012}
 --- !u!137 &3490026887107322216
 SkinnedMeshRenderer:
   m_ObjectHideFlags: 0
