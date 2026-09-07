@@ -15,13 +15,13 @@ MonoBehaviour:
   enemyName: Monstruo Mutante 7
   enemyType: 2
   enemyPrefab: {fileID: 290884568573657152, guid: 6ec18304030011c47aaa07296ea319e0, type: 3}
-  maxHealth: 200
-  baseDamage: 1
-  moveSpeed: 2
-  attackRange: 1
-  attackCooldown: 1.2
-  minGoldDrop: 50
-  maxGoldDrop: 150
+  maxHealth: 350
+  baseDamage: 30
+  moveSpeed: 3.2
+  attackRange: 2.2
+  attackCooldown: 1.4
+  minGoldDrop: 100
+  maxGoldDrop: 250
   lootTable:
   - item: {fileID: 11400000, guid: e88230455e480a943b6e045d608153e0, type: 2}
     dropChance: 0.5

@@ -90,10 +90,73 @@ public class RuntimeGameSetup : MonoBehaviour
         GameObject oldTopBar = GameObject.Find("TopBar");
         if (oldTopBar != null) Object.DestroyImmediate(oldTopBar);
 
+        // 6. Asegurar Mercader Físico (NPC de la Tienda)
+        EnsureMerchantNPC();
+
         if (FindAnyObjectByType<UIManager>() == null)
         {
             CreateRuntimeUI();
         }
+    }
+
+    private static void EnsureMerchantNPC()
+    {
+        if (FindAnyObjectByType<MerchantNPC>() != null) return;
+
+        // Buscar modelo del mercader
+        GameObject merchantModel = Resources.Load<GameObject>("Merchant");
+        if (merchantModel == null)
+        {
+            GameObject[] allFbx = Resources.FindObjectsOfTypeAll<GameObject>();
+            foreach (var go in allFbx)
+            {
+                if (go != null && go.name.Equals("Merchant") && go.transform.root == go.transform)
+                {
+                    merchantModel = go;
+                    break;
+                }
+            }
+        }
+
+        Vector3 spawnPos = new Vector3(4.5f, 0f, 4.5f);
+        GameObject merchantObj;
+
+        if (merchantModel != null)
+        {
+            merchantObj = Object.Instantiate(merchantModel, spawnPos, Quaternion.Euler(0, -135, 0));
+            merchantObj.name = "Merchant_NPC";
+        }
+        else
+        {
+            merchantObj = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            merchantObj.name = "Merchant_NPC";
+            merchantObj.transform.position = spawnPos;
+            merchantObj.transform.rotation = Quaternion.Euler(0, -135, 0);
+            Renderer r = merchantObj.GetComponent<Renderer>();
+            if (r != null) r.material.color = new Color(0.2f, 0.5f, 0.8f);
+        }
+
+        CapsuleCollider col = merchantObj.GetComponent<CapsuleCollider>();
+        if (col == null && merchantObj.GetComponent<Collider>() == null)
+        {
+            col = merchantObj.AddComponent<CapsuleCollider>();
+            col.center = new Vector3(0, 0.9f, 0);
+            col.height = 1.8f;
+            col.radius = 0.4f;
+        }
+
+        MerchantNPC npc = merchantObj.GetComponent<MerchantNPC>();
+        if (npc == null) merchantObj.AddComponent<MerchantNPC>();
+
+        // Pequeña luz de ambiente cálida para el mercader
+        GameObject lightObj = new GameObject("Merchant_Light", typeof(Light));
+        lightObj.transform.SetParent(merchantObj.transform, false);
+        lightObj.transform.localPosition = new Vector3(0f, 2.2f, 0.5f);
+        Light l = lightObj.GetComponent<Light>();
+        l.type = LightType.Point;
+        l.color = new Color(1f, 0.75f, 0.35f);
+        l.range = 7f;
+        l.intensity = 2f;
     }
 
     private static void CreateRuntimeUI()
