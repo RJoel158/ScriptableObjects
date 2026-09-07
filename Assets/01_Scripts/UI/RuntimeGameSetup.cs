@@ -23,6 +23,7 @@ public class RuntimeGameSetup : MonoBehaviour
         EnsureSceneSetup();
     }
 
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     public static void EnsureSceneSetup()
     {
         // 1. Asegurar EventSystem

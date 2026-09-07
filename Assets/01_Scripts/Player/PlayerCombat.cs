@@ -24,8 +24,10 @@ public class PlayerCombat : MonoBehaviour
 
     [Header("Current Weapon State")]
     public WeaponData currentWeapon;
-    [Tooltip("Opcional: Si colocaste manualmente un arma en el hueso de la mano en la jerarquía, arrástrala aquí.")]
+    [Tooltip("Opcional: Modelo de pistola en la mano derecha del soldado en la jerarquía.")]
     public GameObject customHandWeaponModel;
+    [Tooltip("Opcional: Modelo de fusil (AK47/AK74) en la mano derecha del soldado en la jerarquía.")]
+    public GameObject customHandRifleModel;
     private GameObject currentEquippedModel;
     private float nextFireTime = 0f;
     private Camera mainCamera;
@@ -58,10 +60,7 @@ public class PlayerCombat : MonoBehaviour
             defaultAnimatorController = animator.runtimeAnimatorController;
         }
 
-        if (customHandWeaponModel != null)
-        {
-            currentEquippedModel = customHandWeaponModel;
-        }
+        AutoFindHierarchyWeapons();
     }
 
     void Start()
@@ -268,6 +267,49 @@ public class PlayerCombat : MonoBehaviour
             if (result != null) return result;
         }
 
+    public void AutoFindHierarchyWeapons()
+    {
+        AutoDetectRightHand();
+
+        Transform rootToSearch = handTransform != null ? handTransform : transform;
+
+        // Auto-descubrir Pistola en jerarquía si no está asignada
+        if (customHandWeaponModel == null)
+        {
+            customHandWeaponModel = FindChildWithKeywords(rootToSearch, new string[] { "colt", "m1911", "pistol", "gun" });
+            if (customHandWeaponModel == null && handTransform != transform)
+            {
+                customHandWeaponModel = FindChildWithKeywords(transform, new string[] { "colt", "m1911", "pistol", "gun" });
+            }
+        }
+
+        // Auto-descubrir Fusil AK47 / AK74 en jerarquía si no está asignado
+        if (customHandRifleModel == null)
+        {
+            customHandRifleModel = FindChildWithKeywords(rootToSearch, new string[] { "ak74", "ak47", "ak-74", "ak-47", "rifle", "fusil", "m4" });
+            if (customHandRifleModel == null && handTransform != transform)
+            {
+                customHandRifleModel = FindChildWithKeywords(transform, new string[] { "ak74", "ak47", "ak-74", "ak-47", "rifle", "fusil", "m4" });
+            }
+        }
+    }
+
+    private GameObject FindChildWithKeywords(Transform parent, string[] keywords)
+    {
+        if (parent == null) return null;
+        Transform[] allChildren = parent.GetComponentsInChildren<Transform>(true);
+        foreach (var child in allChildren)
+        {
+            if (child == parent || child == transform) continue;
+            string childName = child.name.ToLower();
+            foreach (var kw in keywords)
+            {
+                if (childName.Contains(kw))
+                {
+                    return child.gameObject;
+                }
+            }
+        }
         return null;
     }
 
@@ -277,37 +319,55 @@ public class PlayerCombat : MonoBehaviour
         currentWeapon = weapon;
         isReloading = false;
 
-        AutoDetectRightHand();
+        AutoFindHierarchyWeapons();
 
         // 1. Destruir cualquier modelo de arma previamente instanciado dinámicamente
-        if (currentEquippedModel != null && currentEquippedModel != customHandWeaponModel)
+        if (currentEquippedModel != null && currentEquippedModel != customHandWeaponModel && currentEquippedModel != customHandRifleModel)
         {
             Destroy(currentEquippedModel);
             currentEquippedModel = null;
         }
 
-        // 2. Si hay un modelo manual en la mano (ej: la Colt 1911 fijada en el soldado)
-        if (customHandWeaponModel != null)
+        // 2. Manejar modelos manuales en la mano según categoría
+        if (weapon.weaponCategory == WeaponType.Pistol)
         {
-            if (weapon.weaponCategory == WeaponType.Pistol)
+            if (customHandWeaponModel != null)
             {
                 customHandWeaponModel.SetActive(true);
                 currentEquippedModel = customHandWeaponModel;
             }
-            else
+            if (customHandRifleModel != null)
             {
-                customHandWeaponModel.SetActive(false); // Ocultar la Colt cuando equipamos el AK u otra arma
+                customHandRifleModel.SetActive(false);
             }
         }
+        else if (weapon.weaponCategory == WeaponType.Rifle)
+        {
+            if (customHandWeaponModel != null)
+            {
+                customHandWeaponModel.SetActive(false);
+            }
+            if (customHandRifleModel != null)
+            {
+                customHandRifleModel.SetActive(true);
+                currentEquippedModel = customHandRifleModel;
+            }
+        }
+        else
+        {
+            if (customHandWeaponModel != null) customHandWeaponModel.SetActive(false);
+            if (customHandRifleModel != null) customHandRifleModel.SetActive(false);
+        }
 
-        // 3. Si no se usó el modelo manual, instanciar el prefab configurado en el ScriptableObject del arma (ej: AK-74)
-        if (currentEquippedModel == null || currentEquippedModel != customHandWeaponModel)
+        // 3. Si no hay modelo manual configurado o detectado en la mano para esta categoría, instanciar el prefab del ScriptableObject
+        if (currentEquippedModel == null || (currentEquippedModel != customHandWeaponModel && currentEquippedModel != customHandRifleModel))
         {
             GameObject prefabToSpawn = weapon.weaponModelPrefab != null ? weapon.weaponModelPrefab : weapon.itemPrefab;
             if (prefabToSpawn != null)
             {
-                currentEquippedModel = Instantiate(prefabToSpawn, handTransform);
-                currentEquippedModel.transform.SetParent(handTransform, false);
+                Transform parentMount = handTransform != null ? handTransform : transform;
+                currentEquippedModel = Instantiate(prefabToSpawn, parentMount);
+                currentEquippedModel.transform.SetParent(parentMount, false);
                 currentEquippedModel.transform.localPosition = weapon.weaponEquipOffset;
                 currentEquippedModel.transform.localEulerAngles = weapon.weaponEquipRotation;
                 currentEquippedModel.transform.localScale = weapon.weaponScale != Vector3.zero ? weapon.weaponScale : Vector3.one;
@@ -358,6 +418,20 @@ public class PlayerCombat : MonoBehaviour
         }
     }
 
+    public bool IsReloadingOrPlayingReload()
+    {
+        if (isReloading) return true;
+        if (animator != null && animator.layerCount > 0)
+        {
+            var state = animator.GetCurrentAnimatorStateInfo(0);
+            if (state.IsName("Player_Reload") || state.IsTag("Reload"))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void TryAttack()
     {
         if (currentWeapon == null)
@@ -378,7 +452,8 @@ public class PlayerCombat : MonoBehaviour
             if (currentWeapon == null) return;
         }
 
-        if (isReloading) return;
+        // Bloqueo total de disparo durante toda la duración de la recarga
+        if (IsReloadingOrPlayingReload()) return;
         if (Time.time < nextFireTime) return;
 
         if (currentWeapon.usesAmmo)
@@ -538,19 +613,27 @@ public class PlayerCombat : MonoBehaviour
 
         if (animator != null)
         {
+            animator.ResetTrigger(ShootHash);
             animator.SetTrigger(ReloadHash);
         }
 
         HUDUI hud = FindAnyObjectByType<HUDUI>();
         if (hud != null) hud.ShowNotification("Recargando...");
 
-        yield return new WaitForSeconds(currentWeapon.reloadDuration);
+        float duration = (currentWeapon != null && currentWeapon.reloadDuration > 0) ? currentWeapon.reloadDuration : 3.2f;
+        yield return new WaitForSeconds(duration);
 
-        int needed = currentWeapon.magazineCapacity - currentMagAmmo;
-        int toLoad = Mathf.Min(needed, currentReserveAmmo);
+        if (currentWeapon != null)
+        {
+            int needed = currentWeapon.magazineCapacity - currentMagAmmo;
+            int toLoad = Mathf.Min(needed, currentReserveAmmo);
 
-        currentMagAmmo += toLoad;
-        currentReserveAmmo -= toLoad;
+            currentMagAmmo += toLoad;
+            currentReserveAmmo -= toLoad;
+        }
+
+        // Breve pausa para asegurar que la animación haya salido por completo de la transición
+        yield return new WaitForSeconds(0.15f);
 
         isReloading = false;
         NotifyAmmoChanged();

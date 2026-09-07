@@ -32,7 +32,7 @@ MonoBehaviour:
   usesAmmo: 1
   magazineCapacity: 30
   maxReserveAmmo: 180
-  reloadDuration: 1.8
+  reloadDuration: 3.2
   animatorOverride: {fileID: 0}
   weaponModelPrefab: {fileID: 100000, guid: ee329c3cd08e58645834d20702d7f6c6, type: 3}
   projectilePrefab: {fileID: 0}
