@@ -119,7 +119,11 @@ public class StoreUI : MonoBehaviour
     {
         if (Store.Instance != null && item != null)
         {
-            Store.Instance.BuyItemFromStore(item, 1);
+            bool bought = Store.Instance.BuyItemFromStore(item, 1);
+            if (bought && Inventory.Instance != null)
+            {
+                UpdateGoldDisplay(Inventory.Instance.CurrentGold);
+            }
         }
     }
 

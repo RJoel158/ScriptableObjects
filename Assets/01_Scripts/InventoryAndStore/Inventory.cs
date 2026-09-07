@@ -159,7 +159,7 @@ public class Inventory : MonoBehaviour
         // Si es paquete de munición, rellenar arma directamente
         if (item is AmmoData ammo)
         {
-            PlayerCombat combat = FindAnyObjectByType<PlayerCombat>();
+            PlayerCombat combat = PlayerCombat.Instance != null ? PlayerCombat.Instance : FindAnyObjectByType<PlayerCombat>();
             if (combat != null)
             {
                 combat.RefillAmmo(ammo.ammoAmount * quantity);

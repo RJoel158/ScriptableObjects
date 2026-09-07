@@ -648,16 +648,30 @@ public class PlayerCombat : MonoBehaviour
         {
             currentReserveAmmo += amount;
             currentReserveAmmo = Mathf.Min(currentReserveAmmo, currentWeapon.maxReserveAmmo * 2);
-            NotifyAmmoChanged();
+        }
+        else
+        {
+            currentReserveAmmo += amount;
+        }
 
-            HUDUI hud = FindAnyObjectByType<HUDUI>();
-            if (hud != null) hud.ShowNotification($"+{amount} Balas recibidas");
+        NotifyAmmoChanged();
+
+        HUDUI hud = HUDUI.Instance != null ? HUDUI.Instance : FindAnyObjectByType<HUDUI>();
+        if (hud != null)
+        {
+            hud.UpdateAmmoUI(currentMagAmmo, currentReserveAmmo, isReloading);
+            hud.ShowNotification($"+{amount} Balas recibidas");
         }
     }
 
-    private void NotifyAmmoChanged()
+    public void NotifyAmmoChanged()
     {
         OnAmmoChanged?.Invoke(currentMagAmmo, currentReserveAmmo, isReloading);
+        HUDUI hud = HUDUI.Instance != null ? HUDUI.Instance : FindAnyObjectByType<HUDUI>();
+        if (hud != null)
+        {
+            hud.UpdateAmmoUI(currentMagAmmo, currentReserveAmmo, isReloading);
+        }
     }
 
     private GameObject CreateDefaultProjectileObject(Vector3 pos, Vector3 dir, Color color)
