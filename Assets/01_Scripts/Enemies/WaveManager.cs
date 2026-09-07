@@ -42,7 +42,6 @@ public class WaveManager : MonoBehaviour
     private int enemiesKilledThisWave = 0;
     private bool isWaveInProgress = false;
     private float waveCountdownTimer = 0f;
-    private bool bossSpawnedThisWave = false;
 
     private readonly List<GameObject> activeEnemiesList = new List<GameObject>();
 

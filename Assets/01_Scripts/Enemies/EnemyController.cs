@@ -67,13 +67,31 @@ public class EnemyController : MonoBehaviour, IDamageable
         }
     }
 
-    protected virtual void Start()
+    public void AutoAssignPlayerTarget()
     {
-        if (targetPlayer == null)
+        if (targetPlayer != null) return;
+        PlayerController player = FindAnyObjectByType<PlayerController>();
+        if (player != null)
+        {
+            targetPlayer = player.transform;
+            return;
+        }
+        GameObject pObj = GameObject.FindGameObjectWithTag("Player");
+        if (pObj != null) targetPlayer = pObj.transform;
+    }
+
+    protected virtual void OnValidate()
+    {
+        if (targetPlayer == null && !Application.isPlaying)
         {
             PlayerController player = FindAnyObjectByType<PlayerController>();
             if (player != null) targetPlayer = player.transform;
         }
+    }
+
+    protected virtual void Start()
+    {
+        AutoAssignPlayerTarget();
 
         if (enemyData != null && maxHealth == 0)
         {

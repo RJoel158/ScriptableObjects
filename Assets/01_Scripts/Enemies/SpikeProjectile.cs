@@ -30,8 +30,8 @@ public class SpikeProjectile : MonoBehaviour
         float distanceThisFrame = speed * Time.deltaTime;
         Vector3 nextPos = transform.position + moveDirection * distanceThisFrame;
 
-        // Detección de impacto mediante Raycast continuo
-        if (Physics.Raycast(transform.position, moveDirection, out RaycastHit hit, distanceThisFrame + 0.1f))
+        // Detección de impacto mediante SphereCast continuo
+        if (Physics.SphereCast(transform.position, hitRadius, moveDirection, out RaycastHit hit, distanceThisFrame + 0.1f))
         {
             if (hit.collider != null)
             {

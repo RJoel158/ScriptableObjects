@@ -116,7 +116,7 @@ public class RuntimeGameSetup : MonoBehaviour
     private static void EnsureMerchantNPC()
     {
         // Limpiar cualquier NPC placeholder o cilindro anterior
-        MerchantNPC[] existingNpcs = Object.FindObjectsByType<MerchantNPC>(FindObjectsSortMode.None);
+        MerchantNPC[] existingNpcs = Object.FindObjectsByType<MerchantNPC>();
         foreach (var npc in existingNpcs)
         {
             if (npc != null)

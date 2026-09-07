@@ -44,8 +44,8 @@ public static class PlayerAnimatorLayerSetup
             mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.Head, true);
             mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftArm, true);
             mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.RightArm, true);
-            mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftHand, true);
-            mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.RightHand, true);
+            mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftFingers, true);
+            mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.RightFingers, true);
             mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.LeftHandIK, true);
             mask.SetHumanoidBodyPartActive(AvatarMaskBodyPart.RightHandIK, true);
 
