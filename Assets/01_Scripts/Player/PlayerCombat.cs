@@ -267,6 +267,9 @@ public class PlayerCombat : MonoBehaviour
             if (result != null) return result;
         }
 
+        return null;
+    }
+
     public void AutoFindHierarchyWeapons()
     {
         AutoDetectRightHand();
