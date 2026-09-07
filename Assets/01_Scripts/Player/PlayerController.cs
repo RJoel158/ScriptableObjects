@@ -275,18 +275,55 @@ public class PlayerController : MonoBehaviour
         if (!CanMove || mainCamera == null) return;
 
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        Plane groundPlane = new Plane(Vector3.up, new Vector3(0f, transform.position.y, 0f));
+        Vector3 targetPoint = Vector3.zero;
+        bool foundHit = false;
 
-        if (groundPlane.Raycast(ray, out float enterDistance))
+        // 1. Raycast contra enemigos, obstáculos y objetos en el mundo
+        RaycastHit[] hits = Physics.RaycastAll(ray, 150f, ~0, QueryTriggerInteraction.Ignore);
+        if (hits != null && hits.Length > 0)
         {
-            Vector3 hitPoint = ray.GetPoint(enterDistance);
-            Vector3 lookDirection = hitPoint - transform.position;
-            lookDirection.y = 0f;
-
-            if (lookDirection.sqrMagnitude > 0.001f)
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            foreach (var h in hits)
             {
-                transform.rotation = Quaternion.LookRotation(lookDirection);
+                if (h.collider != null && h.collider.gameObject != gameObject && !h.transform.IsChildOf(transform))
+                {
+                    targetPoint = h.point;
+                    foundHit = true;
+                    break;
+                }
             }
+        }
+
+        // 2. Si no impactó contra un collider, proyectar sobre el plano horizontal a la altura del arma (pecho/hombro)
+        if (!foundHit)
+        {
+            float aimHeight = transform.position.y + 1.25f;
+            Plane aimPlane = new Plane(Vector3.up, new Vector3(0f, aimHeight, 0f));
+            if (aimPlane.Raycast(ray, out float enterDist))
+            {
+                targetPoint = ray.GetPoint(enterDist);
+            }
+            else
+            {
+                Plane groundPlane = new Plane(Vector3.up, new Vector3(0f, transform.position.y, 0f));
+                if (groundPlane.Raycast(ray, out float gDist))
+                {
+                    targetPoint = ray.GetPoint(gDist);
+                }
+                else
+                {
+                    targetPoint = ray.GetPoint(30f);
+                }
+            }
+        }
+
+        Vector3 lookDirection = targetPoint - transform.position;
+        lookDirection.y = 0f;
+
+        if (lookDirection.sqrMagnitude > 0.001f)
+        {
+            // Rotación rápida y suave hacia el punto de mira
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(lookDirection), Time.deltaTime * 28f);
         }
     }
 }

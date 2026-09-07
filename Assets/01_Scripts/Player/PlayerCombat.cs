@@ -488,29 +488,40 @@ public class PlayerCombat : MonoBehaviour
         PerformAttack();
     }
 
+    public Vector3 GetMuzzleFirePosition()
+    {
+        if (firePoint != null) return firePoint.position;
+
+        if (currentEquippedModel != null)
+        {
+            Transform[] children = currentEquippedModel.GetComponentsInChildren<Transform>(true);
+            foreach (var c in children)
+            {
+                string n = c.name.ToLower();
+                if (n.Contains("muzzle") || n.Contains("tip") || n.Contains("firepoint") || n.Contains("barrel") || n.Contains("nozzle"))
+                {
+                    return c.position;
+                }
+            }
+
+            return currentEquippedModel.transform.position + currentEquippedModel.transform.forward * 0.55f + Vector3.up * 0.04f;
+        }
+
+        if (handTransform != null)
+        {
+            return handTransform.position + transform.forward * 0.45f + Vector3.up * 0.05f;
+        }
+
+        return transform.position + transform.forward * 0.6f + Vector3.up * 1.3f;
+    }
+
     private void PerformAttack()
     {
         PerspectiveCameraController camCtrl = PerspectiveCameraController.Instance;
         bool isFirstPerson = camCtrl != null && camCtrl.IsFirstPerson;
 
-        // Calcular posición de salida del proyectil (boca del cañón / mano)
-        Vector3 spawnPos;
-        if (firePoint != null)
-        {
-            spawnPos = firePoint.position;
-        }
-        else if (currentEquippedModel != null)
-        {
-            spawnPos = currentEquippedModel.transform.position + transform.forward * 0.35f + Vector3.up * 0.08f;
-        }
-        else if (handTransform != null)
-        {
-            spawnPos = handTransform.position + transform.forward * 0.35f + Vector3.up * 0.05f;
-        }
-        else
-        {
-            spawnPos = transform.position + transform.forward * 0.6f + Vector3.up * 1.3f;
-        }
+        // Calcular posición de salida del proyectil (boca del cañón / muzzle)
+        Vector3 spawnPos = GetMuzzleFirePosition();
 
         Vector3 aimDirection = transform.forward;
         Vector3 targetPoint = spawnPos + transform.forward * 50f;
@@ -521,7 +532,7 @@ public class PlayerCombat : MonoBehaviour
             Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
             RaycastHit[] hits = Physics.RaycastAll(ray, 150f, ~0, QueryTriggerInteraction.Ignore);
             
-            Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
             bool foundHit = false;
 
             foreach (var h in hits)
@@ -543,33 +554,44 @@ public class PlayerCombat : MonoBehaviour
         }
         else if (mainCamera != null)
         {
-            // Vista Top-down / Tercera persona: apuntar hacia el cursor del ratón
+            // Vista Top-down / Project Zomboid: apuntar hacia el cursor del ratón con precisión 3D
             Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
             RaycastHit[] hits = Physics.RaycastAll(ray, 150f, ~0, QueryTriggerInteraction.Ignore);
             
-            Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
             bool foundHit = false;
-
-            foreach (var h in hits)
+            if (hits != null && hits.Length > 0)
             {
-                if (h.collider != null && h.collider.gameObject != gameObject && !h.transform.IsChildOf(transform))
+                System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+                foreach (var h in hits)
                 {
-                    targetPoint = h.point;
-                    foundHit = true;
-                    break;
+                    if (h.collider != null && h.collider.gameObject != gameObject && !h.transform.IsChildOf(transform))
+                    {
+                        targetPoint = h.point;
+                        foundHit = true;
+                        break;
+                    }
                 }
             }
 
             if (!foundHit)
             {
-                Plane groundPlane = new Plane(Vector3.up, new Vector3(0f, spawnPos.y, 0f));
-                if (groundPlane.Raycast(ray, out float enterDist))
+                // Plano a la altura del cañón del arma
+                Plane aimPlane = new Plane(Vector3.up, new Vector3(0f, spawnPos.y, 0f));
+                if (aimPlane.Raycast(ray, out float enterDist))
                 {
                     targetPoint = ray.GetPoint(enterDist);
                 }
                 else
                 {
-                    targetPoint = ray.GetPoint(50f);
+                    Plane groundPlane = new Plane(Vector3.up, new Vector3(0f, transform.position.y, 0f));
+                    if (groundPlane.Raycast(ray, out float gDist))
+                    {
+                        targetPoint = ray.GetPoint(gDist);
+                    }
+                    else
+                    {
+                        targetPoint = ray.GetPoint(50f);
+                    }
                 }
             }
 

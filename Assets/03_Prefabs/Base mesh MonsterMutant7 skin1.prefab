@@ -1843,11 +1843,36 @@ MonoBehaviour:
   enemyData: {fileID: 11400000, guid: 1e56fc51f249426f8b291b700dfe27a5, type: 2}
   targetPlayer: {fileID: 0}
   heightOffset: 0
-  animator: {fileID: 0}
+  animator: {fileID: 3490026887111630760}
   currentPhase: 0
   jumpAttackCooldown: 7.5
   spikeAttackCooldown: 3.5
-  spikeLaunchPoint: {fileID: 0}
+  leftBigSpike: {fileID: 3490026887102542088}
+  rightBigSpike: {fileID: 3490026887102542100}
+  leftHandSpike: {fileID: 0}
+  rightHandSpike: {fileID: 0}
+  allSpikePoints:
+  - {fileID: 3490026887102542088}
+  - {fileID: 3490026887102542090}
+  - {fileID: 3490026887102542092}
+  - {fileID: 3490026887102542094}
+  - {fileID: 3490026887102542080}
+  - {fileID: 3490026887102542086}
+  - {fileID: 3490026887102542104}
+  - {fileID: 3490026887102542106}
+  - {fileID: 3490026887102542108}
+  - {fileID: 3490026887102542110}
+  - {fileID: 3490026887102542100}
+  - {fileID: 3490026887102542102}
+  - {fileID: 3490026887102542120}
+  - {fileID: 3490026887102542122}
+  - {fileID: 3490026887102542124}
+  - {fileID: 3490026887102542114}
+  - {fileID: 3490026887102542116}
+  - {fileID: 3490026887102542118}
+  - {fileID: 3490026887102542136}
+  - {fileID: 3490026887102542138}
+  - {fileID: 3490026887102542140}
 --- !u!1 &3490026887102114922
 GameObject:
   m_ObjectHideFlags: 0
