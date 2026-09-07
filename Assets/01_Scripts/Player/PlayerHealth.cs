@@ -25,6 +25,9 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
     }
 
+    private static readonly int HitHash = Animator.StringToHash("Hit");
+    private static readonly int DieHash = Animator.StringToHash("Die");
+
     public void TakeDamage(int amount, Vector3 hitPoint, Vector3 hitDirection)
     {
         if (isDead) return;
@@ -41,6 +44,14 @@ public class PlayerHealth : MonoBehaviour, IDamageable
 
         Debug.Log($"[Jugador] Daño recibido: {amount}. Vida restante: {currentHealth}/{maxHealth}");
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
+
+        // Disparar animación de impacto si el jugador sigue vivo y no está en forcejeo
+        PlayerController ctrl = GetComponent<PlayerController>();
+        Animator anim = GetComponentInChildren<Animator>();
+        if (anim != null && currentHealth > 0 && (ctrl == null || !ctrl.IsInGrappleQTE))
+        {
+            anim.SetTrigger(HitHash);
+        }
 
         if (currentHealth <= 0)
         {
@@ -63,6 +74,31 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         if (isDead) return;
         isDead = true;
         Debug.LogWarning("[Jugador] Ha muerto.");
+
+        PlayerController ctrl = GetComponent<PlayerController>();
+        if (ctrl != null)
+        {
+            ctrl.CanMove = false;
+        }
+
+        PlayerCombat combat = GetComponent<PlayerCombat>();
+        if (combat != null)
+        {
+            combat.enabled = false;
+        }
+
+        Animator anim = GetComponentInChildren<Animator>();
+        if (anim != null)
+        {
+            anim.SetTrigger(DieHash);
+        }
+
+        HUDUI hud = FindAnyObjectByType<HUDUI>();
+        if (hud != null)
+        {
+            hud.ShowNotification("☠ ¡HAS MUERTO! Presiona Reiniciar");
+        }
+
         OnPlayerDied?.Invoke();
     }
 

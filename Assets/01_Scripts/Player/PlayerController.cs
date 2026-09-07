@@ -24,6 +24,13 @@ public class PlayerController : MonoBehaviour
     private EnemyController currentGrappler;
     private Coroutine grappleRoutine;
 
+    // Animator Hashes
+    private static readonly int SpeedHash = Animator.StringToHash("Speed");
+    private static readonly int IsMovingHash = Animator.StringToHash("isMoving");
+    private static readonly int MoveXHash = Animator.StringToHash("MoveX");
+    private static readonly int MoveZHash = Animator.StringToHash("MoveZ");
+    private static readonly int StruggleHash = Animator.StringToHash("Struggle");
+
     public void StartGrappleQTE(EnemyController grabber, float duration = 2.5f)
     {
         if (IsInGrappleQTE || grabber == null) return;
@@ -36,6 +43,12 @@ public class PlayerController : MonoBehaviour
         IsInGrappleQTE = true;
         CanMove = false;
         GrappleProgress = 0.2f;
+
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+        if (animator != null)
+        {
+            animator.SetBool(StruggleHash, true);
+        }
 
         HUDUI hud = FindAnyObjectByType<HUDUI>();
         if (hud != null) hud.ShowQTEPrompt(true);
@@ -52,7 +65,7 @@ public class PlayerController : MonoBehaviour
         if (GrappleProgress >= 1f)
         {
             // ¡Éxito en el QTE! El jugador se libra y empuja al zombie
-            if (hud != null) hud.ShowNotification("💥 ¡TE HAS LIBRADO DEL ZOMBIE!");
+            if (hud != null) hud.ShowNotification("¡TE HAS LIBRADO DEL ZOMBIE!");
             if (currentGrappler != null)
             {
                 currentGrappler.ApplyKnockback(transform.forward, 2.5f);
@@ -67,7 +80,12 @@ public class PlayerController : MonoBehaviour
             {
                 health.TakeDamage(35, transform.position, transform.forward);
             }
-            if (hud != null) hud.ShowNotification("🩸 ¡MORDIDA SEVERA RECIBIDA!");
+            if (hud != null) hud.ShowNotification("¡MORDIDA SEVERA RECIBIDA!");
+        }
+
+        if (animator != null)
+        {
+            animator.SetBool(StruggleHash, false);
         }
 
         if (hud != null) hud.ShowQTEPrompt(false);
@@ -87,19 +105,13 @@ public class PlayerController : MonoBehaviour
         IsStunned = true;
         CanMove = false;
         HUDUI hud = FindAnyObjectByType<HUDUI>();
-        if (hud != null) hud.ShowNotification("⚠️ ¡ATURDIDO!");
+        if (hud != null) hud.ShowNotification("¡ATURDIDO!");
 
         yield return new WaitForSeconds(duration);
 
         IsStunned = false;
         CanMove = true;
     }
-
-    // Animator Hashes
-    private static readonly int SpeedHash = Animator.StringToHash("Speed");
-    private static readonly int IsMovingHash = Animator.StringToHash("isMoving");
-    private static readonly int MoveXHash = Animator.StringToHash("MoveX");
-    private static readonly int MoveZHash = Animator.StringToHash("MoveZ");
 
     void Awake()
     {

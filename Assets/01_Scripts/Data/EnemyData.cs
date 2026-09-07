@@ -12,10 +12,8 @@ public class LootDrop
 
 public enum EnemyType
 {
-    GoblinMelee,
-    SkeletonShooter,
-    OrcBerserker,
-    BossGolem
+    Zombie,
+    MutantBoss
 }
 
 [CreateAssetMenu(fileName = "Enemy_New", menuName = "RPG/Enemy/Enemy Data")]
@@ -23,7 +21,7 @@ public class EnemyData : ScriptableObject
 {
     [Header("Identificación")]
     public string enemyName = "Enemigo Base";
-    public EnemyType enemyType = EnemyType.GoblinMelee;
+    public EnemyType enemyType = EnemyType.Zombie;
     public GameObject enemyPrefab;
 
     [Header("Estadísticas Base")]
