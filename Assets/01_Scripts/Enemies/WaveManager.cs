@@ -7,32 +7,43 @@ public class WaveManager : MonoBehaviour
 {
     public static WaveManager Instance { get; private set; }
 
-    [Header("Wave Settings")]
+    [Header("Wave Progression Settings")]
     [SerializeField] private int currentWave = 0;
     [SerializeField] private float timeBetweenWaves = 5f;
     [SerializeField] private int baseEnemiesPerWave = 6;
     [SerializeField] private int enemiesIncreasePerWave = 3;
-    [SerializeField] private float spawnRadius = 11f;
+    [SerializeField] private float spawnRadius = 12f;
+
+    [Header("Progressive Horde Flow")]
+    [Tooltip("Cantidad de zombies que aparecen de golpe al arrancar la ronda")]
+    [SerializeField] private int initialBurstCount = 4;
+    [Tooltip("Máximo de zombies activos simultáneamente en pantalla para no saturar el mapa")]
+    [SerializeField] private int maxSimultaneousEnemies = 7;
+    [Tooltip("Intervalo en segundos entre cada nuevo enemigo que entra como refuerzo")]
+    [SerializeField] private float progressiveSpawnInterval = 2.0f;
 
     [Header("Enemy Catalog & Prefabs")]
     public List<EnemyData> enemyDataList = new List<EnemyData>();
     public GameObject enemyBasePrefab;
 
-    [Header("State")]
-    private int totalEnemiesToSpawn = 0;
+    [Header("Runtime State")]
+    private int totalEnemiesInWave = 0;
     private int enemiesSpawnedSoFar = 0;
-    private int enemiesAlive = 0;
+    private int enemiesKilledThisWave = 0;
     private bool isWaveInProgress = false;
     private float waveCountdownTimer = 0f;
 
+    private readonly List<EnemyController> activeEnemiesList = new List<EnemyController>();
+
     public int CurrentWave => currentWave;
-    public int EnemiesAlive => enemiesAlive;
+    public int EnemiesAlive => activeEnemiesList.Count;
+    public int EnemiesRemainingInWave => Mathf.Max(0, totalEnemiesInWave - enemiesKilledThisWave);
     public bool IsWaveInProgress => isWaveInProgress;
 
     // Eventos
     public event Action<int> OnWaveStarted;
     public event Action<int> OnWaveCompleted;
-    public event Action<int, int> OnEnemyCountChanged; // (vivos, total)
+    public event Action<int, int> OnEnemyCountChanged; // (restantes, total)
     public event Action<float> OnWaveCountdownChanged;
 
     void Awake()
@@ -44,7 +55,10 @@ public class WaveManager : MonoBehaviour
         else if (Instance != this)
         {
             Destroy(gameObject);
+            return;
         }
+
+        CleanupEnemyDataList();
     }
 
     void Start()
@@ -52,22 +66,52 @@ public class WaveManager : MonoBehaviour
         StartCoroutine(WaveRoutine());
     }
 
+    private void CleanupEnemyDataList()
+    {
+        if (enemyDataList != null)
+        {
+            enemyDataList.RemoveAll(e => e == null);
+        }
+        else
+        {
+            enemyDataList = new List<EnemyData>();
+        }
+
+        if (enemyDataList.Count == 0)
+        {
+            EnemyData[] found = Resources.FindObjectsOfTypeAll<EnemyData>();
+            if (found != null && found.Length > 0)
+            {
+                foreach (var e in found)
+                {
+                    if (e != null && !enemyDataList.Contains(e))
+                    {
+                        enemyDataList.Add(e);
+                    }
+                }
+            }
+        }
+    }
+
     private IEnumerator WaveRoutine()
     {
-        yield return new WaitForSeconds(1.0f);
+        yield return new WaitForSeconds(1.2f);
 
         while (true)
         {
             currentWave++;
-            totalEnemiesToSpawn = baseEnemiesPerWave + (currentWave - 1) * enemiesIncreasePerWave;
+            totalEnemiesInWave = baseEnemiesPerWave + (currentWave - 1) * enemiesIncreasePerWave;
             enemiesSpawnedSoFar = 0;
-            enemiesAlive = totalEnemiesToSpawn;
+            enemiesKilledThisWave = 0;
+            activeEnemiesList.Clear();
             isWaveInProgress = true;
 
-            OnWaveStarted?.Invoke(currentWave);
-            OnEnemyCountChanged?.Invoke(enemiesAlive, totalEnemiesToSpawn);
+            CleanupEnemyDataList();
 
-            Debug.Log($"[Oleadas] ¡Comenzando Oleada {currentWave}! Total de enemigos: {totalEnemiesToSpawn}");
+            OnWaveStarted?.Invoke(currentWave);
+            OnEnemyCountChanged?.Invoke(totalEnemiesInWave, totalEnemiesInWave);
+
+            Debug.Log($"[Oleadas] ¡Comenzando Oleada {currentWave}! Total de enemigos en esta ronda: {totalEnemiesInWave}");
 
             bool isBossWave = (currentWave % 5 == 0);
             if (isBossWave)
@@ -76,31 +120,62 @@ public class WaveManager : MonoBehaviour
                 if (hud != null) hud.ShowNotification("ALERTA: ¡JEFE MUTANTE EN CAMINO!");
             }
 
-            // Multiplicadores escalados progresivamente con la oleada
+            // Multiplicadores progresivos
             float healthMult = 1f + (currentWave - 1) * 0.25f;
             float damageMult = 1f + (currentWave - 1) * 0.20f;
             float speedMult = Mathf.Min(1.6f, 1f + (currentWave - 1) * 0.05f);
 
-            // Generar los enemigos de la oleada de manera visible y continua
-            for (int i = 0; i < totalEnemiesToSpawn; i++)
+            // 1. RÁFAGA INICIAL: Generar un grupo inicial visible (ej. 3-5 zombies de golpe)
+            int burstToSpawn = Mathf.Min(initialBurstCount, totalEnemiesInWave);
+            for (int i = 0; i < burstToSpawn; i++)
             {
-                bool isBoss = isBossWave && (i == totalEnemiesToSpawn - 1);
-                SpawnEnemy(i, totalEnemiesToSpawn, healthMult, damageMult, speedMult, isBoss);
+                bool isBoss = isBossWave && (enemiesSpawnedSoFar == totalEnemiesInWave - 1);
+                SpawnSingleEnemy(enemiesSpawnedSoFar, totalEnemiesInWave, healthMult, damageMult, speedMult, isBoss);
                 enemiesSpawnedSoFar++;
-                yield return new WaitForSeconds(0.12f);
+                yield return new WaitForSeconds(0.15f);
             }
 
-            // Esperar hasta que todos los enemigos sean derrotados
-            while (enemiesAlive > 0)
+            // 2. REFUERZOS PROGRESIVOS: Ir soltando enemigos poco a poco (1 a 1 cada X segundos)
+            while (enemiesSpawnedSoFar < totalEnemiesInWave)
             {
-                yield return new WaitForSeconds(0.5f);
+                // Limpiar referencias nulas de la lista de activos
+                activeEnemiesList.RemoveAll(e => e == null);
+
+                // Si hay espacio en el tope simultáneo, enviar el siguiente refuerzo
+                if (activeEnemiesList.Count < maxSimultaneousEnemies)
+                {
+                    bool isBoss = isBossWave && (enemiesSpawnedSoFar == totalEnemiesInWave - 1);
+                    SpawnSingleEnemy(enemiesSpawnedSoFar, totalEnemiesInWave, healthMult, damageMult, speedMult, isBoss);
+                    enemiesSpawnedSoFar++;
+                    yield return new WaitForSeconds(progressiveSpawnInterval);
+                }
+                else
+                {
+                    // Si llegamos al límite en pantalla, esperar medio segundo a que el jugador reduzca la horda
+                    yield return new WaitForSeconds(0.5f);
+                }
+            }
+
+            // 3. FASE FINAL DE LA RONDA: Esperar a que todos los enemigos generados sean eliminados
+            while (enemiesKilledThisWave < totalEnemiesInWave || activeEnemiesList.Count > 0)
+            {
+                activeEnemiesList.RemoveAll(e => e == null);
+
+                // Failsafe de seguridad: si ya no hay enemigos activos en escena pero no cuadró el contador, cerrar ronda
+                if (enemiesSpawnedSoFar >= totalEnemiesInWave && activeEnemiesList.Count == 0)
+                {
+                    enemiesKilledThisWave = totalEnemiesInWave;
+                    break;
+                }
+
+                yield return new WaitForSeconds(0.4f);
             }
 
             isWaveInProgress = false;
             OnWaveCompleted?.Invoke(currentWave);
-            Debug.Log($"[Oleadas] ¡Oleada {currentWave} completada con éxito!");
+            Debug.Log($"[Oleadas] ¡Oleada {currentWave} superada con éxito!");
 
-            // Recompensa de oleada
+            // Recompensa de Oro
             int waveBonusGold = isBossWave ? (100 + currentWave * 20) : (25 + currentWave * 10);
             if (Inventory.Instance != null)
             {
@@ -114,7 +189,7 @@ public class WaveManager : MonoBehaviour
                 }
             }
 
-            // Descanso entre oleadas para ir a la tienda
+            // Descanso entre rondas con cuenta regresiva
             waveCountdownTimer = timeBetweenWaves;
             while (waveCountdownTimer > 0)
             {
@@ -125,7 +200,7 @@ public class WaveManager : MonoBehaviour
         }
     }
 
-    private void SpawnEnemy(int index, int total, float healthMult, float damageMult, float speedMult, bool isBoss = false)
+    private void SpawnSingleEnemy(int index, int total, float healthMult, float damageMult, float speedMult, bool isBoss = false)
     {
         EnemyData chosenData = null;
 
@@ -146,46 +221,26 @@ public class WaveManager : MonoBehaviour
         {
             if (enemyDataList == null || enemyDataList.Count == 0)
             {
-                EnemyData[] foundEnemies = Resources.FindObjectsOfTypeAll<EnemyData>();
-                if (foundEnemies != null && foundEnemies.Length > 0)
-                {
-                    enemyDataList = new List<EnemyData>();
-                    foreach (var e in foundEnemies)
-                    {
-                        if (e != null && (e.name.ToLower().Contains("zombie") || e.enemyName.ToLower().Contains("zombie")))
-                        {
-                            enemyDataList.Add(e);
-                        }
-                    }
-
-                    if (enemyDataList.Count == 0)
-                    {
-                        foreach (var e in foundEnemies)
-                        {
-                            if (e != null && !e.name.ToLower().Contains("mutant"))
-                            {
-                                enemyDataList.Add(e);
-                                break;
-                            }
-                        }
-                    }
-                }
+                CleanupEnemyDataList();
             }
 
             if (enemyDataList != null && enemyDataList.Count > 0)
             {
-                int enemyIndex = UnityEngine.Random.Range(0, enemyDataList.Count);
-                chosenData = enemyDataList[enemyIndex];
+                // Filtrar nulos y elegir
+                List<EnemyData> validList = enemyDataList.FindAll(e => e != null);
+                if (validList.Count > 0)
+                {
+                    int enemyIndex = UnityEngine.Random.Range(0, validList.Count);
+                    chosenData = validList[enemyIndex];
+                }
             }
         }
 
-        if (chosenData == null) return;
+        // Posición de spawn distribuida en círculo alrededor del jugador
+        Vector3 spawnPos = GetSpawnPosition(index, total, chosenData != null ? chosenData.groundYOffset : 0f);
 
-        // Posición de spawn distribuida en abanico/círculo alrededor del jugador
-        Vector3 spawnPos = GetSpawnPosition(index, total, chosenData.groundYOffset);
-
-        GameObject enemyObj;
-        if (chosenData.enemyPrefab != null)
+        GameObject enemyObj = null;
+        if (chosenData != null && chosenData.enemyPrefab != null)
         {
             enemyObj = Instantiate(chosenData.enemyPrefab, spawnPos, Quaternion.identity);
         }
@@ -198,10 +253,19 @@ public class WaveManager : MonoBehaviour
             enemyObj = CreateProceduralEnemyObject(spawnPos, chosenData);
         }
 
+        if (enemyObj == null) return;
+
         EnemyController controller = enemyObj.GetComponent<EnemyController>();
         if (controller == null) controller = enemyObj.AddComponent<EnemyController>();
 
         controller.Initialize(chosenData, healthMult, damageMult, speedMult);
+
+        if (!activeEnemiesList.Contains(controller))
+        {
+            activeEnemiesList.Add(controller);
+        }
+
+        OnEnemyCountChanged?.Invoke(EnemiesRemainingInWave, totalEnemiesInWave);
     }
 
     private Vector3 GetSpawnPosition(int index, int total, float yOffset = 0f)
@@ -209,9 +273,9 @@ public class WaveManager : MonoBehaviour
         PlayerController player = FindAnyObjectByType<PlayerController>();
         Vector3 center = player != null ? player.transform.position : Vector3.zero;
 
-        // Distribución angular alrededor del jugador (360 grados repartidos con dispersión aleatoria)
+        // Distribución angular alrededor del jugador
         float baseAngle = (total > 0) ? (index * (360f / total)) : UnityEngine.Random.Range(0f, 360f);
-        float angle = (baseAngle + UnityEngine.Random.Range(-18f, 18f)) * Mathf.Deg2Rad;
+        float angle = (baseAngle + UnityEngine.Random.Range(-20f, 20f)) * Mathf.Deg2Rad;
         float dist = UnityEngine.Random.Range(spawnRadius * 0.85f, spawnRadius * 1.25f);
 
         float x = center.x + Mathf.Sin(angle) * dist;
@@ -223,18 +287,16 @@ public class WaveManager : MonoBehaviour
     private GameObject CreateProceduralEnemyObject(Vector3 pos, EnemyData data)
     {
         GameObject enemy = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-        enemy.name = $"Enemy_{data.enemyName}";
+        enemy.name = data != null ? $"Enemy_{data.enemyName}" : "Enemy_Procedural";
         enemy.tag = "Enemy";
         enemy.transform.position = pos;
 
-        // Visual
         Renderer r = enemy.GetComponent<Renderer>();
-        if (r != null)
+        if (r != null && data != null)
         {
             r.material.color = data.bodyColor;
         }
 
-        // Rigidbody opcional cinemático para física
         Rigidbody rb = enemy.AddComponent<Rigidbody>();
         rb.isKinematic = true;
 
@@ -243,7 +305,26 @@ public class WaveManager : MonoBehaviour
 
     public void OnEnemyDefeated(EnemyController enemy)
     {
-        enemiesAlive = Mathf.Max(0, enemiesAlive - 1);
-        OnEnemyCountChanged?.Invoke(enemiesAlive, totalEnemiesToSpawn);
+        if (enemy != null && activeEnemiesList.Contains(enemy))
+        {
+            activeEnemiesList.Remove(enemy);
+        }
+        else
+        {
+            activeEnemiesList.RemoveAll(e => e == null);
+        }
+
+        enemiesKilledThisWave++;
+        OnEnemyCountChanged?.Invoke(EnemiesRemainingInWave, totalEnemiesInWave);
+    }
+
+    public void UnregisterActiveEnemy(EnemyController enemy)
+    {
+        if (enemy != null && activeEnemiesList.Contains(enemy))
+        {
+            activeEnemiesList.Remove(enemy);
+            enemiesKilledThisWave++;
+            OnEnemyCountChanged?.Invoke(EnemiesRemainingInWave, totalEnemiesInWave);
+        }
     }
 }

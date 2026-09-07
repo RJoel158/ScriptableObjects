@@ -423,4 +423,12 @@ public class EnemyController : MonoBehaviour, IDamageable
             }
         }
     }
+
+    void OnDestroy()
+    {
+        if (WaveManager.Instance != null && !isDead)
+        {
+            WaveManager.Instance.UnregisterActiveEnemy(this);
+        }
+    }
 }

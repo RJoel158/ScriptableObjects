@@ -3652,7 +3652,6 @@ MonoBehaviour:
   spawnRadius: 20
   enemyDataList:
   - {fileID: 11400000, guid: 5b4b19a8abcf438083fb2a318482136c, type: 2}
-  - {fileID: 0}
   enemyBasePrefab: {fileID: 4127960938634840145, guid: a5295e78cd3f41f4d9ccd1f82ccb9e0e, type: 3}
 --- !u!4 &1719477395
 Transform:
