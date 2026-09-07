@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb1f62be5aa4a034989d54d616b6a767, type: 3}
+  m_Name: Item_WeaponAK74
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponData
+  id: weapon_ak74_01
+  itemName: Fusil de Asalto AK-74
+  itemDescription: Rifle de asalto militar de alto calibre y precisi\xF3n en 1ra
+    y 3ra persona.
+  itemIcon: {fileID: 21300000, guid: f8e40594514695442a79021b0869349a, type: 3}
+  itemType: 0
+  rarity: 2
+  itemPrice: 500
+  sellPrice: 250
+  itemStackSize: 1
+  itemPrefab: {fileID: 1487774384131766, guid: ee329c3cd08e58645834d20702d7f6c6, type: 3}
+  weaponCategory: 1
+  damage: 42
+  attackSpeed: 6
+  projectileSpeed: 38
+  attackRange: 50
+  isRanged: 1
+  usesAmmo: 1
+  magazineCapacity: 30
+  maxReserveAmmo: 180
+  reloadDuration: 1.8
+  animatorOverride: {fileID: 0}
+  weaponModelPrefab: {fileID: 100000, guid: ee329c3cd08e58645834d20702d7f6c6, type: 3}
+  projectilePrefab: {fileID: 0}
+  projectileColor: {r: 1, g: 0.8, b: 0.2, a: 1}
+  weaponEquipOffset: {x: 0, y: 0, z: 0}
+  weaponEquipRotation: {x: 0, y: 0, z: 0}
+  weaponScale: {x: 1, y: 1, z: 1}

@@ -10,9 +10,9 @@ public class WaveManager : MonoBehaviour
     [Header("Wave Settings")]
     [SerializeField] private int currentWave = 0;
     [SerializeField] private float timeBetweenWaves = 5f;
-    [SerializeField] private int baseEnemiesPerWave = 4;
+    [SerializeField] private int baseEnemiesPerWave = 6;
     [SerializeField] private int enemiesIncreasePerWave = 3;
-    [SerializeField] private float spawnRadius = 15f;
+    [SerializeField] private float spawnRadius = 11f;
 
     [Header("Enemy Catalog & Prefabs")]
     public List<EnemyData> enemyDataList = new List<EnemyData>();
@@ -54,14 +54,14 @@ public class WaveManager : MonoBehaviour
 
     private IEnumerator WaveRoutine()
     {
-        yield return new WaitForSeconds(1.5f);
+        yield return new WaitForSeconds(1.0f);
 
         while (true)
         {
             currentWave++;
             totalEnemiesToSpawn = baseEnemiesPerWave + (currentWave - 1) * enemiesIncreasePerWave;
             enemiesSpawnedSoFar = 0;
-            enemiesAlive = 0;
+            enemiesAlive = totalEnemiesToSpawn;
             isWaveInProgress = true;
 
             OnWaveStarted?.Invoke(currentWave);
@@ -69,20 +69,25 @@ public class WaveManager : MonoBehaviour
 
             Debug.Log($"[Oleadas] ¡Comenzando Oleada {currentWave}! Total de enemigos: {totalEnemiesToSpawn}");
 
-            // Multiplicadores escalados con la oleada
-            float healthMult = 1f + (currentWave - 1) * 0.35f;
-            float damageMult = 1f + (currentWave - 1) * 0.25f;
+            bool isBossWave = (currentWave % 5 == 0);
+            if (isBossWave)
+            {
+                HUDUI hud = FindAnyObjectByType<HUDUI>();
+                if (hud != null) hud.ShowNotification("ALERTA: ¡JEFE MUTANTE EN CAMINO!");
+            }
+
+            // Multiplicadores escalados progresivamente con la oleada
+            float healthMult = 1f + (currentWave - 1) * 0.25f;
+            float damageMult = 1f + (currentWave - 1) * 0.20f;
             float speedMult = Mathf.Min(1.6f, 1f + (currentWave - 1) * 0.05f);
 
-            // Generar enemigos en intervalos
-            while (enemiesSpawnedSoFar < totalEnemiesToSpawn)
+            // Generar los enemigos de la oleada de manera visible y continua
+            for (int i = 0; i < totalEnemiesToSpawn; i++)
             {
-                SpawnEnemy(healthMult, damageMult, speedMult);
+                bool isBoss = isBossWave && (i == totalEnemiesToSpawn - 1);
+                SpawnEnemy(i, totalEnemiesToSpawn, healthMult, damageMult, speedMult, isBoss);
                 enemiesSpawnedSoFar++;
-                enemiesAlive++;
-                OnEnemyCountChanged?.Invoke(enemiesAlive, totalEnemiesToSpawn);
-
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.8f, 1.8f));
+                yield return new WaitForSeconds(0.12f);
             }
 
             // Esperar hasta que todos los enemigos sean derrotados
@@ -96,10 +101,17 @@ public class WaveManager : MonoBehaviour
             Debug.Log($"[Oleadas] ¡Oleada {currentWave} completada con éxito!");
 
             // Recompensa de oleada
-            int waveBonusGold = 20 + currentWave * 10;
+            int waveBonusGold = isBossWave ? (100 + currentWave * 20) : (25 + currentWave * 10);
             if (Inventory.Instance != null)
             {
                 Inventory.Instance.AddGold(waveBonusGold);
+                HUDUI hud = FindAnyObjectByType<HUDUI>();
+                if (hud != null)
+                {
+                    hud.ShowNotification(isBossWave 
+                        ? $"¡JEFE DERROTADO! +{waveBonusGold} Oro" 
+                        : $"¡Ronda {currentWave} superada! +{waveBonusGold} Oro");
+                }
             }
 
             // Descanso entre oleadas para ir a la tienda
@@ -113,20 +125,64 @@ public class WaveManager : MonoBehaviour
         }
     }
 
-    private void SpawnEnemy(float healthMult, float damageMult, float speedMult)
+    private void SpawnEnemy(int index, int total, float healthMult, float damageMult, float speedMult, bool isBoss = false)
     {
-        if (enemyDataList == null || enemyDataList.Count == 0) return;
+        EnemyData chosenData = null;
 
-        // Seleccionar tipo de enemigo según la oleada
-        int enemyIndex = 0;
-        if (currentWave >= 3 && enemyDataList.Count > 1)
+        if (isBoss)
         {
-            enemyIndex = UnityEngine.Random.Range(0, enemyDataList.Count);
+            EnemyData[] all = Resources.FindObjectsOfTypeAll<EnemyData>();
+            foreach (var e in all)
+            {
+                if (e != null && (e.name.ToLower().Contains("mutant") || e.enemyName.ToLower().Contains("mutant")))
+                {
+                    chosenData = e;
+                    break;
+                }
+            }
         }
-        EnemyData chosenData = enemyDataList[enemyIndex];
 
-        // Posición de spawn alrededor del jugador
-        Vector3 spawnPos = GetRandomSpawnPosition();
+        if (chosenData == null)
+        {
+            if (enemyDataList == null || enemyDataList.Count == 0)
+            {
+                EnemyData[] foundEnemies = Resources.FindObjectsOfTypeAll<EnemyData>();
+                if (foundEnemies != null && foundEnemies.Length > 0)
+                {
+                    enemyDataList = new List<EnemyData>();
+                    foreach (var e in foundEnemies)
+                    {
+                        if (e != null && (e.name.ToLower().Contains("zombie") || e.enemyName.ToLower().Contains("zombie")))
+                        {
+                            enemyDataList.Add(e);
+                        }
+                    }
+
+                    if (enemyDataList.Count == 0)
+                    {
+                        foreach (var e in foundEnemies)
+                        {
+                            if (e != null && !e.name.ToLower().Contains("mutant"))
+                            {
+                                enemyDataList.Add(e);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (enemyDataList != null && enemyDataList.Count > 0)
+            {
+                int enemyIndex = UnityEngine.Random.Range(0, enemyDataList.Count);
+                chosenData = enemyDataList[enemyIndex];
+            }
+        }
+
+        if (chosenData == null) return;
+
+        // Posición de spawn distribuida en abanico/círculo alrededor del jugador
+        Vector3 spawnPos = GetSpawnPosition(index, total, chosenData.groundYOffset);
 
         GameObject enemyObj;
         if (chosenData.enemyPrefab != null)
@@ -148,13 +204,20 @@ public class WaveManager : MonoBehaviour
         controller.Initialize(chosenData, healthMult, damageMult, speedMult);
     }
 
-    private Vector3 GetRandomSpawnPosition()
+    private Vector3 GetSpawnPosition(int index, int total, float yOffset = 0f)
     {
-        PlayerController player = FindFirstObjectByType<PlayerController>();
+        PlayerController player = FindAnyObjectByType<PlayerController>();
         Vector3 center = player != null ? player.transform.position : Vector3.zero;
 
-        Vector2 randomCircle = UnityEngine.Random.insideUnitCircle.normalized * spawnRadius;
-        return new Vector3(center.x + randomCircle.x, 0.5f, center.z + randomCircle.y);
+        // Distribución angular alrededor del jugador (360 grados repartidos con dispersión aleatoria)
+        float baseAngle = (total > 0) ? (index * (360f / total)) : UnityEngine.Random.Range(0f, 360f);
+        float angle = (baseAngle + UnityEngine.Random.Range(-18f, 18f)) * Mathf.Deg2Rad;
+        float dist = UnityEngine.Random.Range(spawnRadius * 0.85f, spawnRadius * 1.25f);
+
+        float x = center.x + Mathf.Sin(angle) * dist;
+        float z = center.z + Mathf.Cos(angle) * dist;
+
+        return new Vector3(x, yOffset, z);
     }
 
     private GameObject CreateProceduralEnemyObject(Vector3 pos, EnemyData data)

@@ -1,29 +1,108 @@
+using System;
+using System.Collections;
 using UnityEngine;
 
 public class PlayerCombat : MonoBehaviour
 {
-    [Header("Weapon Mount")]
+    public static PlayerCombat Instance { get; private set; }
+
+    [Header("Weapon Mount & Aiming")]
+    [Tooltip("Hueso de la mano derecha. Si lo dejas vacío, el script lo detectará automáticamente")]
     public Transform handTransform;
     public Transform firePoint;
+    public Transform firstPersonCamera;
+
+    [Header("Live Hand Weapon Adjustment")]
+    [Tooltip("Si activas esto, puedes calibrar posición, rotación y escala directamente desde el Inspector en Play Mode")]
+    public bool enableLiveTransformTuning = false;
+    public Vector3 liveWeaponOffset = new Vector3(0.06f, 0.04f, 0.02f);
+    public Vector3 liveWeaponRotation = new Vector3(-10f, 85f, -90f);
+    public Vector3 liveWeaponScale = new Vector3(2.8f, 2.8f, 2.8f);
 
     [Header("Default Visuals & Prefabs")]
-    [SerializeField] private GameObject defaultProjectilePrefab;
-    
+    public GameObject defaultProjectilePrefab;
+
+    [Header("Current Weapon State")]
+    public WeaponData currentWeapon;
+    [Tooltip("Opcional: Si colocaste manualmente un arma en el hueso de la mano en la jerarquía, arrástrala aquí.")]
+    public GameObject customHandWeaponModel;
     private GameObject currentEquippedModel;
-    private WeaponData currentWeapon;
     private float nextFireTime = 0f;
+    private Camera mainCamera;
+    private Animator animator;
+    private RuntimeAnimatorController defaultAnimatorController;
+
+    private Transform spineBone;
+    private Transform chestBone;
+    private Transform headBone;
+
+    [Header("Ammo System")]
+    public int currentMagAmmo;
+    public int currentReserveAmmo;
+    public bool isReloading = false;
+
+    // Animator Hashes
+    private static readonly int WeaponTypeHash = Animator.StringToHash("WeaponType");
+    private static readonly int ShootHash = Animator.StringToHash("Shoot");
+    private static readonly int ReloadHash = Animator.StringToHash("Reload");
+
+    // Eventos
+    public event Action<int, int, bool> OnAmmoChanged;
+
+    void Awake()
+    {
+        if (Instance == null) Instance = this;
+        animator = GetComponentInChildren<Animator>();
+        if (animator != null)
+        {
+            defaultAnimatorController = animator.runtimeAnimatorController;
+        }
+
+        if (customHandWeaponModel != null)
+        {
+            currentEquippedModel = customHandWeaponModel;
+        }
+    }
 
     void Start()
     {
-        // Suscribirse a eventos de inventario
+        mainCamera = Camera.main;
+        AutoDetectRightHand();
+        DetectAimBones();
+
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+
         if (Inventory.Instance != null)
         {
             Inventory.Instance.OnWeaponEquipped += EquipWeapon;
 
-            // Si ya hay un arma equipada por defecto
             if (Inventory.Instance.equippedWeapon != null)
             {
                 EquipWeapon(Inventory.Instance.equippedWeapon);
+            }
+        }
+
+        if (currentWeapon != null)
+        {
+            EquipWeapon(currentWeapon);
+        }
+        else
+        {
+            // Cargar pistola inicial por defecto si no se asignó ninguna
+            WeaponData[] allWeapons = Resources.FindObjectsOfTypeAll<WeaponData>();
+            foreach (var w in allWeapons)
+            {
+                if (w != null && w.weaponCategory == WeaponType.Pistol)
+                {
+                    currentWeapon = w;
+                    EquipWeapon(w);
+                    break;
+                }
+            }
+
+            if (animator != null && currentWeapon == null)
+            {
+                animator.SetInteger(WeaponTypeHash, 0); // 0 = Pistol
             }
         }
     }
@@ -38,13 +117,41 @@ public class PlayerCombat : MonoBehaviour
 
     void Update()
     {
+        if (mainCamera == null) mainCamera = Camera.main;
+
+        // Mantener WeaponType sincronizado en tiempo real con el Animator
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+        if (animator != null)
+        {
+            int targetWeaponType = currentWeapon != null ? (int)currentWeapon.weaponCategory : 0;
+            if (animator.GetInteger(WeaponTypeHash) != targetWeaponType)
+            {
+                animator.SetInteger(WeaponTypeHash, targetWeaponType);
+            }
+        }
+
+        // Sincronizar posición, rotación y escala del arma en tiempo real
+        if (currentEquippedModel != null && currentEquippedModel != customHandWeaponModel)
+        {
+            if (enableLiveTransformTuning)
+            {
+                currentEquippedModel.transform.localPosition = liveWeaponOffset;
+                currentEquippedModel.transform.localEulerAngles = liveWeaponRotation;
+                currentEquippedModel.transform.localScale = liveWeaponScale;
+            }
+            else if (currentWeapon != null)
+            {
+                currentEquippedModel.transform.localPosition = currentWeapon.weaponEquipOffset;
+                currentEquippedModel.transform.localEulerAngles = currentWeapon.weaponEquipRotation;
+                currentEquippedModel.transform.localScale = currentWeapon.weaponScale != Vector3.zero ? currentWeapon.weaponScale : Vector3.one;
+            }
+        }
+
         PlayerHealth health = GetComponent<PlayerHealth>();
         if (health != null && health.IsDead) return;
 
-        // Disparo con clic izquierdo si no está sobre UI
         if (Input.GetMouseButton(0) || Input.GetKey(KeyCode.Space))
         {
-            // Evitar disparar si el puntero está sobre elementos de UI bloqueantes
             if (UnityEngine.EventSystems.EventSystem.current != null && 
                 UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
             {
@@ -53,47 +160,201 @@ public class PlayerCombat : MonoBehaviour
 
             TryAttack();
         }
+
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            TryReload();
+        }
+    }
+
+    public void AutoDetectRightHand()
+    {
+        if (handTransform != null && (handTransform.name.ToLower().Contains("righthand") || handTransform.name.ToLower().Contains("hand_r")))
+        {
+            return;
+        }
+
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+
+        if (animator != null && animator.isHuman)
+        {
+            Transform rightHandBone = animator.GetBoneTransform(HumanBodyBones.RightHand);
+            if (rightHandBone != null)
+            {
+                handTransform = rightHandBone;
+                Debug.Log($"[PlayerCombat] Mano detectada vía HumanBodyBones: {handTransform.name}");
+                return;
+            }
+        }
+
+        Transform soldier = transform.Find("Soldier");
+        Transform searchRoot = soldier != null ? soldier : transform;
+
+        string[] handKeywords = new string[] { "righthand", "hand_r", "hand.r", "right_hand", "hand" };
+        Transform found = SearchBoneRecursive(searchRoot, handKeywords);
+        if (found != null)
+        {
+            handTransform = found;
+            Debug.Log($"[PlayerCombat] Mano detectada por jerarquía de huesos: {handTransform.name}");
+        }
+        else
+        {
+            handTransform = transform;
+        }
+    }
+
+    public void DetectAimBones()
+    {
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+
+        if (animator != null && animator.isHuman)
+        {
+            spineBone = animator.GetBoneTransform(HumanBodyBones.Spine);
+            chestBone = animator.GetBoneTransform(HumanBodyBones.Chest);
+            headBone = animator.GetBoneTransform(HumanBodyBones.Head);
+        }
+
+        Transform soldier = transform.Find("Soldier");
+        Transform searchRoot = soldier != null ? soldier : transform;
+
+        if (spineBone == null) spineBone = SearchBoneRecursive(searchRoot, new string[] { "spine1", "spine_01", "spine" });
+        if (chestBone == null) chestBone = SearchBoneRecursive(searchRoot, new string[] { "spine2", "spine_02", "chest" });
+        if (headBone == null) headBone = SearchBoneRecursive(searchRoot, new string[] { "head" });
+    }
+
+    [Header("Aim Bone Tilting")]
+    [Tooltip("Habilita la inclinación manual del torso con el ratón. Desactivado por defecto para evitar tembleques.")]
+    public bool enableUpperBodyAimPitch = false;
+    private float smoothAimPitch = 0f;
+
+    void LateUpdate()
+    {
+        if (!enableUpperBodyAimPitch) return;
+
+        PerspectiveCameraController camCtrl = PerspectiveCameraController.Instance;
+        if (camCtrl != null && camCtrl.IsInOverTheShoulder)
+        {
+            smoothAimPitch = Mathf.Lerp(smoothAimPitch, camCtrl.CurrentPitch, Time.deltaTime * 18f);
+            if (Mathf.Abs(smoothAimPitch) > 0.01f)
+            {
+                // Inclinar el torso superior de forma sólida y suave (el cuello, cabeza y brazos se mueven naturalmente al unísono)
+                Transform targetBone = chestBone != null ? chestBone : spineBone;
+                if (targetBone != null)
+                {
+                    targetBone.rotation = Quaternion.AngleAxis(smoothAimPitch * 0.60f, transform.right) * targetBone.rotation;
+                }
+            }
+        }
+        else
+        {
+            smoothAimPitch = 0f;
+        }
+    }
+
+    private Transform SearchBoneRecursive(Transform current, string[] keywords)
+    {
+        string currentName = current.name.ToLower();
+        foreach (var kw in keywords)
+        {
+            if (currentName.Contains(kw) && current != transform)
+            {
+                return current;
+            }
+        }
+
+        for (int i = 0; i < current.childCount; i++)
+        {
+            Transform result = SearchBoneRecursive(current.GetChild(i), keywords);
+            if (result != null) return result;
+        }
+
+        return null;
     }
 
     public void EquipWeapon(WeaponData weapon)
     {
+        if (weapon == null) return;
         currentWeapon = weapon;
+        isReloading = false;
 
-        // Destruir modelo previo en la mano
-        if (currentEquippedModel != null)
+        AutoDetectRightHand();
+
+        // 1. Destruir cualquier modelo de arma previamente instanciado dinámicamente
+        if (currentEquippedModel != null && currentEquippedModel != customHandWeaponModel)
         {
             Destroy(currentEquippedModel);
             currentEquippedModel = null;
         }
 
-        if (handTransform == null)
+        // 2. Si hay un modelo manual en la mano (ej: la Colt 1911 fijada en el soldado)
+        if (customHandWeaponModel != null)
         {
-            handTransform = transform;
-        }
-
-        // Instanciar modelo visual del arma
-        if (weapon != null)
-        {
-            if (weapon.weaponModelPrefab != null)
+            if (weapon.weaponCategory == WeaponType.Pistol)
             {
-                currentEquippedModel = Instantiate(weapon.weaponModelPrefab, handTransform);
-            }
-            else if (weapon.itemPrefab != null)
-            {
-                currentEquippedModel = Instantiate(weapon.itemPrefab, handTransform);
+                customHandWeaponModel.SetActive(true);
+                currentEquippedModel = customHandWeaponModel;
             }
             else
             {
-                // Crear modelo procedural básico si no hay prefab asignado
-                currentEquippedModel = CreateProceduralWeaponModel(weapon.weaponCategory);
-                currentEquippedModel.transform.SetParent(handTransform, false);
+                customHandWeaponModel.SetActive(false); // Ocultar la Colt cuando equipamos el AK u otra arma
             }
+        }
 
-            if (currentEquippedModel != null)
+        // 3. Si no se usó el modelo manual, instanciar el prefab configurado en el ScriptableObject del arma (ej: AK-74)
+        if (currentEquippedModel == null || currentEquippedModel != customHandWeaponModel)
+        {
+            GameObject prefabToSpawn = weapon.weaponModelPrefab != null ? weapon.weaponModelPrefab : weapon.itemPrefab;
+            if (prefabToSpawn != null)
             {
+                currentEquippedModel = Instantiate(prefabToSpawn, handTransform);
+                currentEquippedModel.transform.SetParent(handTransform, false);
                 currentEquippedModel.transform.localPosition = weapon.weaponEquipOffset;
                 currentEquippedModel.transform.localEulerAngles = weapon.weaponEquipRotation;
+                currentEquippedModel.transform.localScale = weapon.weaponScale != Vector3.zero ? weapon.weaponScale : Vector3.one;
             }
+        }
+
+        // Actualizar valores de ajuste live para el inspector
+        liveWeaponOffset = weapon.weaponEquipOffset;
+        liveWeaponRotation = weapon.weaponEquipRotation;
+        liveWeaponScale = weapon.weaponScale != Vector3.zero ? weapon.weaponScale : Vector3.one;
+
+        if (weapon.usesAmmo)
+        {
+            currentMagAmmo = weapon.magazineCapacity;
+            currentReserveAmmo = weapon.maxReserveAmmo;
+        }
+        else
+        {
+            currentMagAmmo = -1;
+            currentReserveAmmo = -1;
+        }
+
+        // Actualizar Animator con el tipo de arma o con AnimatorOverrideController
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+        if (animator != null)
+        {
+            if (weapon.animatorOverride != null)
+            {
+                animator.runtimeAnimatorController = weapon.animatorOverride;
+            }
+            else if (defaultAnimatorController != null && animator.runtimeAnimatorController != defaultAnimatorController)
+            {
+                animator.runtimeAnimatorController = defaultAnimatorController;
+            }
+
+            animator.SetInteger(WeaponTypeHash, (int)weapon.weaponCategory);
+        }
+
+        NotifyAmmoChanged();
+    }
+
+    public void OnPerspectiveChanged(CameraPerspective perspective)
+    {
+        if (currentEquippedModel != null && currentWeapon != null && !enableLiveTransformTuning)
+        {
+            currentEquippedModel.transform.localPosition = currentWeapon.weaponEquipOffset;
+            currentEquippedModel.transform.localEulerAngles = currentWeapon.weaponEquipRotation;
         }
     }
 
@@ -101,8 +362,11 @@ public class PlayerCombat : MonoBehaviour
     {
         if (currentWeapon == null)
         {
-            // Intenta equipar la primera arma del inventario si no tiene ninguna equipada
-            if (Inventory.Instance != null)
+            if (Inventory.Instance != null && Inventory.Instance.equippedWeapon != null)
+            {
+                EquipWeapon(Inventory.Instance.equippedWeapon);
+            }
+            else if (Inventory.Instance != null && Inventory.Instance.items.Count > 0)
             {
                 InventorySlot weaponSlot = Inventory.Instance.items.Find(s => s.item is WeaponData);
                 if (weaponSlot != null && weaponSlot.item is WeaponData w)
@@ -110,27 +374,130 @@ public class PlayerCombat : MonoBehaviour
                     Inventory.Instance.EquipWeapon(w);
                 }
             }
+
+            if (currentWeapon == null) return;
         }
 
+        if (isReloading) return;
         if (Time.time < nextFireTime) return;
 
-        float attackRate = currentWeapon != null ? currentWeapon.attackSpeed : 1.5f;
-        nextFireTime = Time.time + (1f / Mathf.Max(attackRate, 0.1f));
+        if (currentWeapon.usesAmmo)
+        {
+            if (currentMagAmmo <= 0)
+            {
+                TryReload();
+                return;
+            }
+
+            currentMagAmmo--;
+            NotifyAmmoChanged();
+        }
+
+        float attackRate = currentWeapon.attackSpeed > 0 ? currentWeapon.attackSpeed : 2.5f;
+        nextFireTime = Time.time + (1f / attackRate);
+
+        if (animator != null)
+        {
+            animator.SetTrigger(ShootHash);
+        }
 
         PerformAttack();
     }
 
     private void PerformAttack()
     {
-        Vector3 spawnPos = firePoint != null ? firePoint.position : (handTransform != null ? handTransform.position + transform.forward * 0.5f : transform.position + transform.forward * 0.8f);
+        PerspectiveCameraController camCtrl = PerspectiveCameraController.Instance;
+        bool isFirstPerson = camCtrl != null && camCtrl.IsFirstPerson;
+
+        // Calcular posición de salida del proyectil (boca del cañón / mano)
+        Vector3 spawnPos;
+        if (firePoint != null)
+        {
+            spawnPos = firePoint.position;
+        }
+        else if (currentEquippedModel != null)
+        {
+            spawnPos = currentEquippedModel.transform.position + transform.forward * 0.35f + Vector3.up * 0.08f;
+        }
+        else if (handTransform != null)
+        {
+            spawnPos = handTransform.position + transform.forward * 0.35f + Vector3.up * 0.05f;
+        }
+        else
+        {
+            spawnPos = transform.position + transform.forward * 0.6f + Vector3.up * 1.3f;
+        }
+
         Vector3 aimDirection = transform.forward;
+        Vector3 targetPoint = spawnPos + transform.forward * 50f;
 
-        int damage = currentWeapon != null ? currentWeapon.damage : 15;
-        float speed = currentWeapon != null ? currentWeapon.projectileSpeed : 22f;
-        float range = currentWeapon != null ? currentWeapon.attackRange : 30f;
-        Color projColor = currentWeapon != null ? currentWeapon.projectileColor : Color.cyan;
+        if (isFirstPerson && mainCamera != null)
+        {
+            // Raycast desde el centro exacto de la pantalla (la mira en cruz)
+            Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            RaycastHit[] hits = Physics.RaycastAll(ray, 150f, ~0, QueryTriggerInteraction.Ignore);
+            
+            Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            bool foundHit = false;
 
-        GameObject projPrefab = currentWeapon != null && currentWeapon.projectilePrefab != null 
+            foreach (var h in hits)
+            {
+                if (h.collider != null && h.collider.gameObject != gameObject && !h.transform.IsChildOf(transform))
+                {
+                    targetPoint = h.point;
+                    foundHit = true;
+                    break;
+                }
+            }
+
+            if (!foundHit)
+            {
+                targetPoint = ray.GetPoint(100f);
+            }
+
+            aimDirection = (targetPoint - spawnPos).normalized;
+        }
+        else if (mainCamera != null)
+        {
+            // Vista Top-down / Tercera persona: apuntar hacia el cursor del ratón
+            Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
+            RaycastHit[] hits = Physics.RaycastAll(ray, 150f, ~0, QueryTriggerInteraction.Ignore);
+            
+            Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            bool foundHit = false;
+
+            foreach (var h in hits)
+            {
+                if (h.collider != null && h.collider.gameObject != gameObject && !h.transform.IsChildOf(transform))
+                {
+                    targetPoint = h.point;
+                    foundHit = true;
+                    break;
+                }
+            }
+
+            if (!foundHit)
+            {
+                Plane groundPlane = new Plane(Vector3.up, new Vector3(0f, spawnPos.y, 0f));
+                if (groundPlane.Raycast(ray, out float enterDist))
+                {
+                    targetPoint = ray.GetPoint(enterDist);
+                }
+                else
+                {
+                    targetPoint = ray.GetPoint(50f);
+                }
+            }
+
+            aimDirection = (targetPoint - spawnPos).normalized;
+        }
+
+        int damage = currentWeapon.damage > 0 ? currentWeapon.damage : 20;
+        float speed = currentWeapon.projectileSpeed > 0 ? currentWeapon.projectileSpeed : 45f;
+        float range = currentWeapon.attackRange > 0 ? currentWeapon.attackRange : 50f;
+        Color projColor = currentWeapon.projectileColor;
+
+        GameObject projPrefab = currentWeapon.projectilePrefab != null 
             ? currentWeapon.projectilePrefab 
             : defaultProjectilePrefab;
 
@@ -141,44 +508,70 @@ public class PlayerCombat : MonoBehaviour
         }
         else
         {
-            // Crear proyectil básico si no hay prefab asignado
             projObj = CreateDefaultProjectileObject(spawnPos, aimDirection, projColor);
         }
 
         Projectile projectile = projObj.GetComponent<Projectile>();
         if (projectile == null) projectile = projObj.AddComponent<Projectile>();
 
-        projectile.Initialize(damage, speed, range, aimDirection, projColor, fromPlayer: true);
+        projectile.Initialize(damage, speed, range, aimDirection, projColor, fromPlayer: true, shooter: gameObject);
     }
 
-    private GameObject CreateProceduralWeaponModel(WeaponType type)
+    public void TryReload()
     {
-        GameObject model = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        model.name = $"Model_{type}";
-        Collider col = model.GetComponent<Collider>();
-        if (col != null) Destroy(col);
-
-        switch (type)
+        if (currentWeapon == null || !currentWeapon.usesAmmo || isReloading) return;
+        if (currentMagAmmo >= currentWeapon.magazineCapacity) return;
+        if (currentReserveAmmo <= 0)
         {
-            case WeaponType.Sword:
-                model.transform.localScale = new Vector3(0.08f, 0.7f, 0.15f);
-                model.transform.localPosition = new Vector3(0.3f, 0.2f, 0.4f);
-                model.transform.localEulerAngles = new Vector3(45f, 0f, 0f);
-                model.GetComponent<Renderer>().material.color = Color.cyan;
-                break;
-            case WeaponType.Bow:
-                model.transform.localScale = new Vector3(0.1f, 0.8f, 0.2f);
-                model.transform.localPosition = new Vector3(0.3f, 0.1f, 0.3f);
-                model.GetComponent<Renderer>().material.color = new Color(0.6f, 0.3f, 0.1f);
-                break;
-            default:
-                model.transform.localScale = new Vector3(0.12f, 0.12f, 0.6f);
-                model.transform.localPosition = new Vector3(0.3f, 0f, 0.4f);
-                model.GetComponent<Renderer>().material.color = Color.yellow;
-                break;
+            HUDUI hud = FindAnyObjectByType<HUDUI>();
+            if (hud != null) hud.ShowNotification("¡Sin munición! Visita la tienda 'T'");
+            return;
         }
 
-        return model;
+        StartCoroutine(ReloadRoutine());
+    }
+
+    private IEnumerator ReloadRoutine()
+    {
+        isReloading = true;
+        NotifyAmmoChanged();
+
+        if (animator != null)
+        {
+            animator.SetTrigger(ReloadHash);
+        }
+
+        HUDUI hud = FindAnyObjectByType<HUDUI>();
+        if (hud != null) hud.ShowNotification("Recargando...");
+
+        yield return new WaitForSeconds(currentWeapon.reloadDuration);
+
+        int needed = currentWeapon.magazineCapacity - currentMagAmmo;
+        int toLoad = Mathf.Min(needed, currentReserveAmmo);
+
+        currentMagAmmo += toLoad;
+        currentReserveAmmo -= toLoad;
+
+        isReloading = false;
+        NotifyAmmoChanged();
+    }
+
+    public void RefillAmmo(int amount)
+    {
+        if (currentWeapon != null && currentWeapon.usesAmmo)
+        {
+            currentReserveAmmo += amount;
+            currentReserveAmmo = Mathf.Min(currentReserveAmmo, currentWeapon.maxReserveAmmo * 2);
+            NotifyAmmoChanged();
+
+            HUDUI hud = FindAnyObjectByType<HUDUI>();
+            if (hud != null) hud.ShowNotification($"+{amount} Balas recibidas");
+        }
+    }
+
+    private void NotifyAmmoChanged()
+    {
+        OnAmmoChanged?.Invoke(currentMagAmmo, currentReserveAmmo, isReloading);
     }
 
     private GameObject CreateDefaultProjectileObject(Vector3 pos, Vector3 dir, Color color)
@@ -186,7 +579,7 @@ public class PlayerCombat : MonoBehaviour
         GameObject proj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         proj.name = "Projectile_Player";
         proj.transform.position = pos;
-        proj.transform.localScale = Vector3.one * 0.35f;
+        proj.transform.localScale = Vector3.one * 0.25f;
         proj.transform.rotation = Quaternion.LookRotation(dir);
 
         SphereCollider col = proj.GetComponent<SphereCollider>();

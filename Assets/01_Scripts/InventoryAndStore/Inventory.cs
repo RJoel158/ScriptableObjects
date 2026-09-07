@@ -37,8 +37,117 @@ public class Inventory : MonoBehaviour
 
     void Start()
     {
+        InitializeStarterLoadout();
         OnGoldChanged?.Invoke(gold);
         OnInventoryChanged?.Invoke();
+    }
+
+    public void InitializeStarterLoadout()
+    {
+        if (items.Count > 0) return;
+
+        ItemData[] allItems = Resources.FindObjectsOfTypeAll<ItemData>();
+        WeaponData primary = null;
+        WeaponData secondary = null;
+        PotionData potion = null;
+        AmmoData ammo = null;
+
+        foreach (var item in allItems)
+        {
+            if (item == null) continue;
+            if (item is WeaponData weapon)
+            {
+                if (weapon.weaponCategory == WeaponType.Pistol && secondary == null)
+                    secondary = weapon;
+                else if (weapon.weaponCategory != WeaponType.Pistol && primary == null)
+                    primary = weapon;
+            }
+            else if (item is PotionData pot && potion == null)
+            {
+                potion = pot;
+            }
+            else if (item is AmmoData am && ammo == null)
+            {
+                ammo = am;
+            }
+        }
+
+        if (secondary != null) AddItem(secondary, 1);
+        if (potion != null) AddItem(potion, 3);
+        if (ammo != null) AddItem(ammo, 2);
+
+        // Equipar pistola secundaria por defecto al iniciar
+        if (secondary != null)
+            EquipWeapon(secondary);
+    }
+
+    public WeaponData GetPrimaryWeapon()
+    {
+        foreach (var slot in items)
+        {
+            if (slot.item is WeaponData w && w.weaponCategory != WeaponType.Pistol)
+                return w;
+        }
+        return null;
+    }
+
+    public WeaponData GetSecondaryWeapon()
+    {
+        foreach (var slot in items)
+        {
+            if (slot.item is WeaponData w && w.weaponCategory == WeaponType.Pistol)
+                return w;
+        }
+        return null;
+    }
+
+    public PotionData GetFirstConsumable()
+    {
+        foreach (var slot in items)
+        {
+            if (slot.item is PotionData p)
+                return p;
+        }
+        return null;
+    }
+
+    public void EquipPrimary()
+    {
+        WeaponData primary = GetPrimaryWeapon();
+        if (primary != null)
+        {
+            EquipWeapon(primary);
+        }
+        else
+        {
+            OnInventoryNotification?.Invoke("¡Compra el Fusil AK-74 en la Tienda [T]!");
+        }
+    }
+
+    public void EquipSecondary()
+    {
+        WeaponData secondary = GetSecondaryWeapon();
+        if (secondary != null)
+        {
+            EquipWeapon(secondary);
+        }
+        else
+        {
+            OnInventoryNotification?.Invoke("No tienes un arma secundaria");
+        }
+    }
+
+    public void UseQuickConsumable()
+    {
+        PotionData potion = GetFirstConsumable();
+        if (potion != null)
+        {
+            UsePotion(potion);
+        }
+        else
+        {
+            OnInventoryNotification?.Invoke("¡No te quedan consumibles / pociones!");
+        }
     }
 
     #region Inventory Management
@@ -46,6 +155,17 @@ public class Inventory : MonoBehaviour
     public void AddItem(ItemData item, int quantity = 1)
     {
         if (item == null || quantity <= 0) return;
+
+        // Si es paquete de munición, rellenar arma directamente
+        if (item is AmmoData ammo)
+        {
+            PlayerCombat combat = FindAnyObjectByType<PlayerCombat>();
+            if (combat != null)
+            {
+                combat.RefillAmmo(ammo.ammoAmount * quantity);
+                return;
+            }
+        }
 
         InventorySlot existingSlot = items.Find(slot => slot.item == item);
         if (existingSlot != null)
@@ -204,7 +324,7 @@ public class Inventory : MonoBehaviour
         if (potion == null) return;
         if (!HasItem(potion, 1)) return;
 
-        PlayerHealth playerHealth = FindFirstObjectByType<PlayerHealth>();
+        PlayerHealth playerHealth = FindAnyObjectByType<PlayerHealth>();
         if (playerHealth != null)
         {
             if (potion.potionType == PotionType.Health)
@@ -232,6 +352,15 @@ public class Inventory : MonoBehaviour
         else if (item is PotionData potion)
         {
             UsePotion(potion);
+        }
+        else if (item is AmmoData ammo)
+        {
+            PlayerCombat combat = FindAnyObjectByType<PlayerCombat>();
+            if (combat != null)
+            {
+                combat.RefillAmmo(ammo.ammoAmount);
+                RemoveItem(ammo, 1);
+            }
         }
         else if (item is ArmorData armor)
         {

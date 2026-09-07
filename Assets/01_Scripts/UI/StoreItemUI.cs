@@ -26,6 +26,7 @@ public class StoreItemUI : MonoBehaviour
         {
             iconImage.enabled = item.itemIcon != null;
             iconImage.sprite = item.itemIcon;
+            iconImage.color = item.itemIcon != null ? Color.white : new Color(1f, 1f, 1f, 0f);
         }
 
         if (nameText != null)
@@ -42,15 +43,15 @@ public class StoreItemUI : MonoBehaviour
         {
             if (item is WeaponData w)
             {
-                statsText.text = $"⚔ {w.damage} Dmg | ⚡ {w.attackSpeed}/s";
+                statsText.text = $"Daño: {w.damage} | Cadencia: {w.attackSpeed}/s";
             }
             else if (item is ArmorData a)
             {
-                statsText.text = $"🛡 +{a.defense} Def | ❤ +{a.bonusMaxHealth} HP";
+                statsText.text = $"Defensa: +{a.defense} | Vida: +{a.bonusMaxHealth} HP";
             }
             else if (item is PotionData p)
             {
-                statsText.text = $"🧪 +{p.healthRestoreAmount} HP";
+                statsText.text = $"Restaura: +{p.healthRestoreAmount} HP";
             }
             else
             {

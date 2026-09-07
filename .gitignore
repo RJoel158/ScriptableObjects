@@ -1,5 +1,5 @@
 # =========================================================================
-# Unity .gitignore Estándar Completo y Recomendado
+# Unity .gitignore Completo y Optimizado
 # =========================================================================
 
 # Carpetas generadas automáticamente por Unity
@@ -53,12 +53,6 @@ ExportedObj/
 *.tmp
 *.user
 *.userprefs
-*.pidb
-*.booproj
-*.svd
-*.pdb
-*.opendb
-*.VC.db
 
 # Unity Profiler / Crash reports
 *.crash
@@ -83,3 +77,32 @@ $RECYCLE.BIN/
 # Cache de paquetes locales
 /Packages/manifest.json.lock
 /Packages/packages-lock.json
+
+# =========================================================================
+# Modelos pesados y paquetes de la Asset Store (Omitidos del repo)
+# =========================================================================
+/Assets/AGWYN's Low Poly Magical Potions Pack/
+/Assets/AGWYN's Low Poly Magical Potions Pack.meta
+/Assets/Low Poly Weapons VOL.1/
+/Assets/Low Poly Weapons VOL.1.meta
+/Assets/MonsterMutant 7/
+/Assets/MonsterMutant 7.meta
+/Assets/NewPunch/
+/Assets/NewPunch.meta
+/Assets/OccaSoftware/
+/Assets/OccaSoftware.meta
+
+# Extensiones de archivos 3D pesados / texturas fuente si no son esenciales
+*.blend
+*.max
+*.ma
+*.mb
+*.psd
+*.tga
+*.raw
+
+# Archivos 3D superiores a 100MB (Excluidos para GitHub)
+**/Soldier.fbx
+**/Soldier.fbx.meta
+**/Ch35_nonPBR.fbx
+**/Ch35_nonPBR.fbx.meta

@@ -38,7 +38,13 @@ public class EnemyData : ScriptableObject
     [Min(0)] public int maxGoldDrop = 15;
     public List<LootDrop> lootTable = new List<LootDrop>();
 
-    [Header("Aspecto Visual")]
+    [Header("Animaciones Opcionales")]
+    public RuntimeAnimatorController animatorController;
+    public Avatar enemyAvatar;
+
+    [Header("Aspecto Visual & Altura")]
+    [Tooltip("Ajuste de altura sobre el suelo (útil para mutantes o crawlers cuyo pivote está en la cintura)")]
+    public float groundYOffset = 0f;
     public Color bodyColor = new Color(0.8f, 0.2f, 0.2f);
     public Vector3 scale = Vector3.one;
 }

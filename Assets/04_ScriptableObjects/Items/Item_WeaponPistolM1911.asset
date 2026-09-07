@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eb1f62be5aa4a034989d54d616b6a767, type: 3}
+  m_Name: Item_WeaponPistolM1911
+  m_EditorClassIdentifier: Assembly-CSharp::WeaponData
+  id: weapon_pistol_m1911
+  itemName: Pistola M1911 (Arma Inicial)
+  itemDescription: Pistola semiautom\xE1tica est\xE1ndar. Da\xF1o prudente, buena
+    cadencia inicial y cargador de 12 balas.
+  itemIcon: {fileID: 21300000, guid: 2dbdff299f5db134da4ef49278f1f15e, type: 3}
+  itemType: 0
+  rarity: 0
+  itemPrice: 50
+  sellPrice: 25
+  itemStackSize: 1
+  itemPrefab: {fileID: 0}
+  weaponCategory: 0
+  damage: 25
+  attackSpeed: 3.5
+  projectileSpeed: 40
+  attackRange: 50
+  isRanged: 1
+  usesAmmo: 1
+  magazineCapacity: 12
+  maxReserveAmmo: 120
+  reloadDuration: 1.2
+  animatorOverride: {fileID: 0}
+  weaponModelPrefab: {fileID: 1694449805434718, guid: 6f1a7354265853f44b0ed5e2e43676ad, type: 3}
+  projectilePrefab: {fileID: 4898316266633158667, guid: 5e41895faea6de643a5c588e30d7a346, type: 3}
+  projectileColor: {r: 1, g: 0.9, b: 0.2, a: 1}
+  weaponEquipOffset: {x: 0.06, y: 0.04, z: 0.02}
+  weaponEquipRotation: {x: -10, y: 85, z: -90}
+  weaponScale: {x: 2.8, y: 2.8, z: 2.8}

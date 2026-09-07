@@ -87,4 +87,29 @@ public class LootPickup : MonoBehaviour
 
         Destroy(gameObject);
     }
+
+    public static GameObject CreatePickup(Vector3 position, LootType type, int gold, ItemData item, int qty)
+    {
+        GameObject lootObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        lootObj.name = type == LootType.Gold ? "Loot_Gold" : $"Loot_{(item != null ? item.itemName : "Item")}";
+        lootObj.transform.position = new Vector3(position.x, 0.4f, position.z);
+        lootObj.transform.localScale = new Vector3(0.4f, 0.4f, 0.4f);
+
+        Collider col = lootObj.GetComponent<Collider>();
+        if (col != null) col.isTrigger = true;
+
+        Renderer rend = lootObj.GetComponent<Renderer>();
+        if (rend != null)
+        {
+            rend.material.color = type == LootType.Gold ? new Color(1f, 0.85f, 0.1f) : new Color(0.2f, 0.9f, 1f);
+        }
+
+        LootPickup pickup = lootObj.AddComponent<LootPickup>();
+        if (type == LootType.Gold)
+            pickup.SetupGold(gold);
+        else
+            pickup.SetupItem(item, qty);
+
+        return lootObj;
+    }
 }

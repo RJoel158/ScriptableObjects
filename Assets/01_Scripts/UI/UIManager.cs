@@ -29,7 +29,7 @@ public class UIManager : MonoBehaviour
 
     void Start()
     {
-        PlayerHealth playerHealth = FindFirstObjectByType<PlayerHealth>();
+        PlayerHealth playerHealth = FindAnyObjectByType<PlayerHealth>();
         if (playerHealth != null)
         {
             playerHealth.OnPlayerDied += ShowGameOver;

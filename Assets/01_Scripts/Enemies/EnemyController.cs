@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 public class EnemyController : MonoBehaviour, IDamageable
@@ -5,6 +6,11 @@ public class EnemyController : MonoBehaviour, IDamageable
     [Header("Data & Configuration")]
     [SerializeField] private EnemyData enemyData;
     [SerializeField] private Transform targetPlayer;
+    [Tooltip("Ajuste manual de altura sobre el suelo: súbelo o bájalo si el modelo se hunde o flota")]
+    public float heightOffset = 0f;
+
+    [Header("Animation")]
+    [SerializeField] private Animator animator;
 
     [Header("Scaled Stats")]
     private int currentHealth;
@@ -16,19 +22,45 @@ public class EnemyController : MonoBehaviour, IDamageable
 
     private float nextAttackTime = 0f;
     private bool isDead = false;
-    private Renderer enemyRenderer;
+    private bool isCrawling = false;
+    private bool isScreaming = false;
+    private Renderer[] enemyRenderers;
     private Color originalColor;
 
     public bool IsDead => isDead;
+    public bool IsCrawling => isCrawling;
     public int CurrentHealth => currentHealth;
     public int MaxHealth => maxHealth;
 
+    // Animator Param Hashes
+    private static readonly int SpeedHash = Animator.StringToHash("Speed");
+    private static readonly int IsMovingHash = Animator.StringToHash("isMoving");
+    private static readonly int IsCrawlingHash = Animator.StringToHash("isCrawling");
+    private static readonly int AttackHash = Animator.StringToHash("Attack");
+    private static readonly int BiteHash = Animator.StringToHash("Bite");
+    private static readonly int ScreamHash = Animator.StringToHash("Scream");
+    private static readonly int HitHash = Animator.StringToHash("Hit");
+    private static readonly int DieHash = Animator.StringToHash("Die");
+
     void Awake()
     {
-        enemyRenderer = GetComponentInChildren<Renderer>();
-        if (enemyRenderer != null)
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+        if (animator != null && enemyData != null)
         {
-            originalColor = enemyRenderer.material.color;
+            if (enemyData.animatorController != null)
+            {
+                animator.runtimeAnimatorController = enemyData.animatorController;
+            }
+            if (enemyData.enemyAvatar != null)
+            {
+                animator.avatar = enemyData.enemyAvatar;
+            }
+            animator.applyRootMotion = false;
+        }
+        enemyRenderers = GetComponentsInChildren<Renderer>();
+        if (enemyRenderers.Length > 0 && enemyRenderers[0] != null && enemyRenderers[0].material != null)
+        {
+            originalColor = enemyRenderers[0].material.color;
         }
     }
 
@@ -36,13 +68,19 @@ public class EnemyController : MonoBehaviour, IDamageable
     {
         if (targetPlayer == null)
         {
-            PlayerController player = FindFirstObjectByType<PlayerController>();
+            PlayerController player = FindAnyObjectByType<PlayerController>();
             if (player != null) targetPlayer = player.transform;
         }
 
         if (enemyData != null && maxHealth == 0)
         {
             Initialize(enemyData, 1f, 1f, 1f);
+        }
+
+        // 35% de probabilidad de lanzar un grito de alerta al aparecer
+        if (Random.value < 0.35f)
+        {
+            StartCoroutine(SpawnScreamRoutine());
         }
     }
 
@@ -57,46 +95,127 @@ public class EnemyController : MonoBehaviour, IDamageable
         this.currentMoveSpeed = data.moveSpeed * speedMultiplier;
         this.attackRange = data.attackRange;
         this.attackCooldown = data.attackCooldown;
+        this.isCrawling = false;
+        this.isScreaming = false;
 
-        transform.localScale = data.scale;
-
-        if (enemyRenderer != null)
+        if (animator == null) animator = GetComponentInChildren<Animator>();
+        if (animator == null) animator = gameObject.AddComponent<Animator>();
+        if (animator != null)
         {
-            enemyRenderer.material.color = data.bodyColor;
-            originalColor = data.bodyColor;
+            if (data.animatorController != null)
+            {
+                animator.runtimeAnimatorController = data.animatorController;
+            }
+            if (data.enemyAvatar != null)
+            {
+                animator.avatar = data.enemyAvatar;
+            }
+            animator.applyRootMotion = false;
         }
+
+        // Asegurar CapsuleCollider para recibir impactos y colisiones
+        CapsuleCollider col = GetComponent<CapsuleCollider>();
+        if (col == null) col = gameObject.AddComponent<CapsuleCollider>();
+        col.center = new Vector3(0f, (data != null && data.groundYOffset > 0.3f) ? 0f : 0.92f, 0f);
+        col.height = 1.85f;
+        col.radius = 0.38f;
+
+        // Si no tiene un prefab personalizado con modelo propio, aplica la escala y color base
+        if (data.enemyPrefab == null)
+        {
+            transform.localScale = data.scale;
+            if (enemyRenderers != null && enemyRenderers.Length > 0 && enemyRenderers[0] != null)
+            {
+                enemyRenderers[0].material.color = data.bodyColor;
+                originalColor = data.bodyColor;
+            }
+        }
+    }
+
+    private IEnumerator SpawnScreamRoutine()
+    {
+        isScreaming = true;
+        yield return new WaitForSeconds(Random.Range(0.2f, 0.6f));
+
+        if (HasValidAnimator && !isDead)
+        {
+            animator.SetTrigger(ScreamHash);
+        }
+
+        yield return new WaitForSeconds(1.2f);
+        isScreaming = false;
     }
 
     void Update()
     {
-        if (isDead) return;
+        if (isDead || isScreaming) return;
 
         if (targetPlayer == null)
         {
-            PlayerController player = FindFirstObjectByType<PlayerController>();
+            PlayerController player = FindAnyObjectByType<PlayerController>();
             if (player != null) targetPlayer = player.transform;
+            UpdateAnimation(0f);
             return;
         }
 
-        float distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.position);
+        // Mantener al enemigo firmemente sobre el nivel del suelo según su offset de pivote y ajuste manual
+        float baseOffset = (enemyData != null) ? enemyData.groundYOffset : 0f;
+        float targetY = baseOffset + heightOffset;
+        Vector3 currentPos = transform.position;
+        currentPos.y = targetY;
 
-        // Rotar hacia el jugador
-        Vector3 dir = (targetPlayer.position - transform.position).normalized;
+        float distanceToPlayer = Vector3.Distance(currentPos, targetPlayer.position);
+
+        // Dirección hacia el jugador
+        Vector3 dir = (targetPlayer.position - currentPos).normalized;
         dir.y = 0;
+
+        // Fuerza de separación entre enemigos para que no se amontonen ni se fusionen en un solo punto
+        Vector3 separationForce = Vector3.zero;
+        Collider[] nearby = Physics.OverlapSphere(currentPos, 1.3f);
+        foreach (var c in nearby)
+        {
+            if (c != null && c.gameObject != gameObject && c.GetComponent<EnemyController>() != null)
+            {
+                Vector3 diff = currentPos - c.transform.position;
+                diff.y = 0f;
+                float sqrDist = diff.sqrMagnitude;
+                if (sqrDist > 0.0001f && sqrDist < 1.69f)
+                {
+                    separationForce += diff.normalized / Mathf.Sqrt(sqrDist);
+                }
+            }
+        }
+
+        Vector3 finalMoveDir = (dir + separationForce * 0.75f).normalized;
+
         if (dir.sqrMagnitude > 0.001f)
         {
-            transform.rotation = Quaternion.LookRotation(dir);
+            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), Time.deltaTime * 10f);
         }
 
         // Persecución o Ataque
         if (distanceToPlayer > attackRange)
         {
-            transform.position += dir * (currentMoveSpeed * Time.deltaTime);
+            transform.position = currentPos + finalMoveDir * (currentMoveSpeed * Time.deltaTime);
+            UpdateAnimation(currentMoveSpeed);
         }
         else
         {
+            transform.position = currentPos;
+            UpdateAnimation(0f);
             TryAttackPlayer();
         }
+    }
+
+    private bool HasValidAnimator => animator != null && animator.runtimeAnimatorController != null;
+
+    private void UpdateAnimation(float speed)
+    {
+        if (!HasValidAnimator) return;
+        animator.SetFloat(SpeedHash, speed);
+        animator.SetBool(IsMovingHash, speed > 0.1f);
+        animator.SetBool(IsCrawlingHash, isCrawling);
     }
 
     private void TryAttackPlayer()
@@ -105,22 +224,95 @@ public class EnemyController : MonoBehaviour, IDamageable
 
         nextAttackTime = Time.time + attackCooldown;
 
+        // 25% de probabilidad de realizar mordida especial en el cuello con Aturdimiento
+        bool isNeckBite = Random.value < 0.25f && !isCrawling;
+
+        if (HasValidAnimator)
+        {
+            if (isNeckBite)
+            {
+                animator.SetTrigger(BiteHash);
+            }
+            else
+            {
+                animator.SetTrigger(AttackHash);
+            }
+        }
+
         PlayerHealth playerHealth = targetPlayer.GetComponent<PlayerHealth>();
+        PlayerController playerController = targetPlayer.GetComponent<PlayerController>();
+
         if (playerHealth != null && !playerHealth.IsDead)
         {
-            playerHealth.TakeDamage(currentDamage, transform.position, transform.forward);
-            Debug.Log($"[Enemigo] {enemyData?.enemyName ?? name} atacó al jugador por {currentDamage} de daño.");
+            int appliedDamage = isNeckBite ? Mathf.RoundToInt(currentDamage * 1.5f) : currentDamage;
+            playerHealth.TakeDamage(appliedDamage, transform.position, transform.forward);
+
+            if (isNeckBite && playerController != null)
+            {
+                // Iniciar forcejeo interactivo QTE donde el jugador debe spamear Espacio
+                playerController.StartGrappleQTE(this, 2.5f);
+                Debug.Log($"[Enemigo] ¡{enemyData?.enemyName ?? name} mordió el cuello del jugador e inició forcejeo QTE!");
+            }
+            else
+            {
+                Debug.Log($"[Enemigo] {enemyData?.enemyName ?? name} atacó al jugador por {appliedDamage} de daño.");
+            }
         }
+    }
+
+    public void ApplyKnockback(Vector3 direction, float distance = 0.5f)
+    {
+        if (isDead) return;
+        direction.y = 0f;
+        transform.position += direction.normalized * distance;
     }
 
     public void TakeDamage(int amount, Vector3 hitPoint, Vector3 hitDirection)
     {
         if (isDead) return;
 
-        currentHealth -= amount;
+        bool isHeadshot = (hitPoint.y >= transform.position.y + 1.25f) && !isCrawling;
+        bool isLegShot = (hitPoint.y <= transform.position.y + 0.65f) && !isCrawling;
+
+        int finalDamage = amount;
+        HUDUI hud = FindAnyObjectByType<HUDUI>();
+
+        if (isHeadshot)
+        {
+            finalDamage = Mathf.RoundToInt(amount * 2.5f);
+            if (hud != null)
+            {
+                hud.TriggerHitmarker(true);
+                hud.ShowNotification("¡HEADSHOT CRÍTICO! (x2.5 Daño)");
+            }
+        }
+        else if (hud != null)
+        {
+            hud.TriggerHitmarker(false);
+        }
+
+        // Si el disparo impacta en las piernas, el zombie tropieza y pasa a modo Crawler
+        if (isLegShot && !isCrawling)
+        {
+            StartCoroutine(TriggerCrawlMode());
+            if (hud != null) hud.ShowNotification("¡Tiro en la pierna! El zombie cae y repta");
+        }
+        else if (!isCrawling && (currentHealth - finalDamage <= maxHealth * 0.4f || Random.value < 0.25f))
+        {
+            StartCoroutine(TriggerCrawlMode());
+        }
+
+        // Empuje físico hacia atrás (Knockback)
+        ApplyKnockback(hitDirection, isHeadshot ? 0.75f : 0.45f);
+
+        currentHealth -= finalDamage;
         currentHealth = Mathf.Max(0, currentHealth);
 
-        // Feedback visual de golpe
+        if (HasValidAnimator)
+        {
+            animator.SetTrigger(HitHash);
+        }
+
         StartCoroutine(HitFlashCoroutine());
 
         if (currentHealth <= 0)
@@ -129,15 +321,49 @@ public class EnemyController : MonoBehaviour, IDamageable
         }
     }
 
-    private System.Collections.IEnumerator HitFlashCoroutine()
+    private IEnumerator TriggerCrawlMode()
     {
-        if (enemyRenderer != null)
+        if (isCrawling) yield break;
+        isCrawling = true;
+
+        // Ajustar el CharacterController al suelo para el gateo
+        CharacterController cc = GetComponent<CharacterController>();
+        if (cc != null)
         {
-            enemyRenderer.material.color = Color.white;
+            cc.height = 0.5f;
+            cc.center = new Vector3(0f, 0.25f, 0f);
+        }
+
+        CapsuleCollider cap = GetComponent<CapsuleCollider>();
+        if (cap != null)
+        {
+            cap.height = 0.5f;
+            cap.center = new Vector3(0f, 0.25f, 0f);
+        }
+
+        if (HasValidAnimator)
+        {
+            animator.SetBool(IsCrawlingHash, true);
+            animator.CrossFade("Zombie_Crawl", 0.12f, 0, 0f);
+        }
+
+        // Aumentar velocidad y agresividad del zombie que repta por el piso
+        currentMoveSpeed = Mathf.Max(currentMoveSpeed * 1.5f, 2.8f);
+        currentDamage += 5;
+        attackRange = 1.0f;
+
+        yield return null;
+    }
+
+    private IEnumerator HitFlashCoroutine()
+    {
+        if (enemyRenderers != null && enemyRenderers.Length > 0 && enemyRenderers[0] != null)
+        {
+            enemyRenderers[0].material.color = Color.white;
             yield return new WaitForSeconds(0.08f);
-            if (!isDead && enemyRenderer != null)
+            if (!isDead && enemyRenderers[0] != null)
             {
-                enemyRenderer.material.color = originalColor;
+                enemyRenderers[0].material.color = originalColor;
             }
         }
     }
@@ -147,65 +373,54 @@ public class EnemyController : MonoBehaviour, IDamageable
         if (isDead) return;
         isDead = true;
 
-        SpawnLoot();
+        // Desactivar colisiones para que no bloquee disparos ni al jugador mientras cae
+        Collider col = GetComponent<Collider>();
+        if (col != null) col.enabled = false;
 
-        WaveManager waveMgr = FindFirstObjectByType<WaveManager>();
+        CharacterController cc = GetComponent<CharacterController>();
+        if (cc != null) cc.enabled = false;
+
+        if (HasValidAnimator)
+        {
+            animator.SetTrigger(DieHash);
+        }
+
+        DropLoot();
+
+        WaveManager waveMgr = FindAnyObjectByType<WaveManager>();
         if (waveMgr != null)
         {
             waveMgr.OnEnemyDefeated(this);
         }
 
-        Destroy(gameObject);
+        // Permitir que la animación completa de muerte (caída al suelo) se reproduzca limpiamente
+        float destroyDelay = HasValidAnimator ? 1.8f : 0.05f;
+        Destroy(gameObject, destroyDelay);
     }
 
-    private void SpawnLoot()
+    private void DropLoot()
     {
         if (enemyData == null) return;
 
-        // 1. Soltar Oro
-        int goldToDrop = Random.Range(enemyData.minGoldDrop, enemyData.maxGoldDrop + 1);
-        if (goldToDrop > 0)
+        int goldDrop = Random.Range(enemyData.minGoldDrop, enemyData.maxGoldDrop + 1);
+        if (goldDrop > 0)
         {
-            GameObject goldObj = CreateLootPickupObject(LootType.Gold);
-            goldObj.transform.position = transform.position + Vector3.up * 0.5f;
-            LootPickup pickup = goldObj.GetComponent<LootPickup>();
-            pickup.SetupGold(goldToDrop);
+            Vector3 dropPos = transform.position + new Vector3(Random.Range(-0.3f, 0.3f), 0f, Random.Range(-0.3f, 0.3f));
+            LootPickup.CreatePickup(dropPos, LootType.Gold, goldDrop, null, 1);
         }
 
-        // 2. Soltar Items según la tabla de botín (Loot Table)
-        if (enemyData.lootTable != null)
+        if (enemyData.lootTable == null || enemyData.lootTable.Count == 0) return;
+
+        foreach (var drop in enemyData.lootTable)
         {
-            foreach (var drop in enemyData.lootTable)
+            if (drop.item == null) continue;
+            float roll = Random.value;
+            if (roll <= drop.dropChance)
             {
-                if (drop.item != null && Random.value <= drop.dropChance)
-                {
-                    int qty = Random.Range(drop.minQuantity, drop.maxQuantity + 1);
-                    GameObject itemObj = CreateLootPickupObject(LootType.Item);
-                    itemObj.transform.position = transform.position + Vector3.up * 0.5f + Random.insideUnitSphere * 0.5f;
-                    itemObj.transform.position = new Vector3(itemObj.transform.position.x, transform.position.y + 0.5f, itemObj.transform.position.z);
-                    LootPickup itemPickup = itemObj.GetComponent<LootPickup>();
-                    itemPickup.SetupItem(drop.item, qty);
-                }
+                int qty = Random.Range(drop.minQuantity, drop.maxQuantity + 1);
+                Vector3 itemDropPos = transform.position + new Vector3(Random.Range(-0.5f, 0.5f), 0f, Random.Range(-0.5f, 0.5f));
+                LootPickup.CreatePickup(itemDropPos, LootType.Item, 0, drop.item, qty);
             }
         }
-    }
-
-    private GameObject CreateLootPickupObject(LootType type)
-    {
-        GameObject loot = GameObject.CreatePrimitive(type == LootType.Gold ? PrimitiveType.Cylinder : PrimitiveType.Cube);
-        loot.name = type == LootType.Gold ? "Loot_Gold" : "Loot_Item";
-        loot.transform.localScale = type == LootType.Gold ? new Vector3(0.4f, 0.08f, 0.4f) : new Vector3(0.35f, 0.35f, 0.35f);
-        
-        Collider c = loot.GetComponent<Collider>();
-        if (c != null) c.isTrigger = true;
-
-        Renderer r = loot.GetComponent<Renderer>();
-        if (r != null)
-        {
-            r.material.color = type == LootType.Gold ? new Color(1f, 0.85f, 0.1f) : new Color(0.2f, 0.8f, 1f);
-        }
-
-        loot.AddComponent<LootPickup>();
-        return loot;
     }
 }
