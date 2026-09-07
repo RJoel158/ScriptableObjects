@@ -41,7 +41,20 @@ public class RuntimeGameSetup : MonoBehaviour
             EnemyData[] enemies = Resources.FindObjectsOfTypeAll<EnemyData>();
             if (enemies != null && enemies.Length > 0)
             {
-                wm.enemyDataList.AddRange(enemies);
+                foreach (var e in enemies)
+                {
+                    if (e != null)
+                    {
+                        if (e.name.ToLower().Contains("mutant") || e.enemyType == EnemyType.MutantBoss)
+                        {
+                            wm.bossEnemyData = e;
+                        }
+                        else if (!wm.enemyDataList.Contains(e))
+                        {
+                            wm.enemyDataList.Add(e);
+                        }
+                    }
+                }
             }
         }
 
