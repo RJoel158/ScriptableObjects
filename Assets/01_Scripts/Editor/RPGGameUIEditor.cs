@@ -31,8 +31,9 @@ public class RPGGameUIEditor : EditorWindow
     {
         PurgeOldUI();
         RuntimeGameSetup.EnsureSceneSetup();
+        PlayerAnimatorLayerSetup.SetupUpperBodySystem(false);
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(UnityEngine.SceneManagement.SceneManager.GetActiveScene());
-        EditorUtility.DisplayDialog("Setup Completo", "¡La UI completa (Barra de vida dinámica, Rondas, Munición, Hotbar táctica, Tienda e Inventario con sprites) se ha configurado y vinculado exitosamente con 1 clic!", "¡Excelente!");
+        EditorUtility.DisplayDialog("Setup Completo", "¡La UI completa (Barra de vida dinámica, Rondas, Munición, Hotbar táctica, Tienda e Inventario con sprites) y las capas de animación (UpperBody Mask) se han configurado y vinculado exitosamente con 1 clic!", "¡Excelente!");
     }
 
     [MenuItem("RPG Survival/🧹 Limpiar y Regenerar UI", false, 20)]

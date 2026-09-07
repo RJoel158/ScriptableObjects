@@ -424,12 +424,15 @@ public class PlayerCombat : MonoBehaviour
     public bool IsReloadingOrPlayingReload()
     {
         if (isReloading) return true;
-        if (animator != null && animator.layerCount > 0)
+        if (animator != null)
         {
-            var state = animator.GetCurrentAnimatorStateInfo(0);
-            if (state.IsName("Player_Reload") || state.IsTag("Reload"))
+            for (int i = 0; i < animator.layerCount; i++)
             {
-                return true;
+                var state = animator.GetCurrentAnimatorStateInfo(i);
+                if (state.IsName("Player_Reload") || state.IsName("Upper_Reload") || state.IsTag("Reload"))
+                {
+                    return true;
+                }
             }
         }
         return false;
