@@ -4,29 +4,29 @@ using UnityEngine;
 public class EnemyController : MonoBehaviour, IDamageable
 {
     [Header("Data & Configuration")]
-    [SerializeField] private EnemyData enemyData;
-    [SerializeField] private Transform targetPlayer;
+    [SerializeField] protected EnemyData enemyData;
+    [SerializeField] protected Transform targetPlayer;
     [Tooltip("Ajuste manual de altura sobre el suelo: súbelo o bájalo si el modelo se hunde o flota")]
     public float heightOffset = 0f;
 
     [Header("Animation")]
-    [SerializeField] private Animator animator;
+    [SerializeField] protected Animator animator;
 
     [Header("Scaled Stats")]
-    private int currentHealth;
-    private int maxHealth;
-    private int currentDamage;
-    private float currentMoveSpeed;
-    private float attackRange;
-    private float attackCooldown;
+    protected int currentHealth;
+    protected int maxHealth;
+    protected int currentDamage;
+    protected float currentMoveSpeed;
+    protected float attackRange;
+    protected float attackCooldown;
 
-    private float nextAttackTime = 0f;
-    private bool isDead = false;
-    private bool isCrawling = false;
-    private bool isCrawlingFast = false;
-    private bool isScreaming = false;
-    private Renderer[] enemyRenderers;
-    private Color originalColor;
+    protected float nextAttackTime = 0f;
+    protected bool isDead = false;
+    protected bool isCrawling = false;
+    protected bool isCrawlingFast = false;
+    protected bool isScreaming = false;
+    protected Renderer[] enemyRenderers;
+    protected Color originalColor;
 
     public bool IsDead => isDead;
     public bool IsCrawling => isCrawling;
@@ -35,17 +35,17 @@ public class EnemyController : MonoBehaviour, IDamageable
     public int MaxHealth => maxHealth;
 
     // Animator Param Hashes
-    private static readonly int SpeedHash = Animator.StringToHash("Speed");
-    private static readonly int IsMovingHash = Animator.StringToHash("isMoving");
-    private static readonly int IsCrawlingHash = Animator.StringToHash("isCrawling");
-    private static readonly int IsCrawlingFastHash = Animator.StringToHash("isCrawlingFast");
-    private static readonly int AttackHash = Animator.StringToHash("Attack");
-    private static readonly int BiteHash = Animator.StringToHash("Bite");
-    private static readonly int ScreamHash = Animator.StringToHash("Scream");
-    private static readonly int HitHash = Animator.StringToHash("Hit");
-    private static readonly int DieHash = Animator.StringToHash("Die");
+    protected static readonly int SpeedHash = Animator.StringToHash("Speed");
+    protected static readonly int IsMovingHash = Animator.StringToHash("isMoving");
+    protected static readonly int IsCrawlingHash = Animator.StringToHash("isCrawling");
+    protected static readonly int IsCrawlingFastHash = Animator.StringToHash("isCrawlingFast");
+    protected static readonly int AttackHash = Animator.StringToHash("Attack");
+    protected static readonly int BiteHash = Animator.StringToHash("Bite");
+    protected static readonly int ScreamHash = Animator.StringToHash("Scream");
+    protected static readonly int HitHash = Animator.StringToHash("Hit");
+    protected static readonly int DieHash = Animator.StringToHash("Die");
 
-    void Awake()
+    protected virtual void Awake()
     {
         if (animator == null) animator = GetComponentInChildren<Animator>();
         if (animator != null && enemyData != null)
@@ -67,7 +67,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         }
     }
 
-    void Start()
+    protected virtual void Start()
     {
         if (targetPlayer == null)
         {
@@ -87,7 +87,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         }
     }
 
-    public void Initialize(EnemyData data, float healthMultiplier = 1f, float damageMultiplier = 1f, float speedMultiplier = 1f)
+    public virtual void Initialize(EnemyData data, float healthMultiplier = 1f, float damageMultiplier = 1f, float speedMultiplier = 1f)
     {
         this.enemyData = data;
         if (data == null) return;
@@ -149,7 +149,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         isScreaming = false;
     }
 
-    void Update()
+    protected virtual void Update()
     {
         if (isDead || isScreaming) return;
 
@@ -211,9 +211,9 @@ public class EnemyController : MonoBehaviour, IDamageable
         }
     }
 
-    private bool HasValidAnimator => animator != null && animator.runtimeAnimatorController != null;
+    protected bool HasValidAnimator => animator != null && animator.runtimeAnimatorController != null;
 
-    private void UpdateAnimation(float speed)
+    protected virtual void UpdateAnimation(float speed)
     {
         if (!HasValidAnimator) return;
         animator.SetFloat(SpeedHash, speed);
@@ -222,7 +222,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         animator.SetBool(IsCrawlingFastHash, isCrawlingFast);
     }
 
-    private void TryAttackPlayer()
+    protected virtual void TryAttackPlayer()
     {
         if (Time.time < nextAttackTime) return;
 
@@ -266,14 +266,14 @@ public class EnemyController : MonoBehaviour, IDamageable
         }
     }
 
-    public void ApplyKnockback(Vector3 direction, float distance = 0.5f)
+    public virtual void ApplyKnockback(Vector3 direction, float distance = 0.5f)
     {
         if (isDead) return;
         direction.y = 0f;
         transform.position += direction.normalized * distance;
     }
 
-    public void TakeDamage(int amount, Vector3 hitPoint, Vector3 hitDirection)
+    public virtual void TakeDamage(int amount, Vector3 hitPoint, Vector3 hitDirection)
     {
         if (isDead) return;
 
@@ -375,7 +375,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         yield return null;
     }
 
-    private IEnumerator HitFlashCoroutine()
+    protected virtual IEnumerator HitFlashCoroutine()
     {
         if (enemyRenderers != null && enemyRenderers.Length > 0 && enemyRenderers[0] != null)
         {
@@ -388,7 +388,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         }
     }
 
-    private void Die()
+    protected virtual void Die()
     {
         if (isDead) return;
         isDead = true;
@@ -418,7 +418,7 @@ public class EnemyController : MonoBehaviour, IDamageable
         Destroy(gameObject, destroyDelay);
     }
 
-    private void DropLoot()
+    protected virtual void DropLoot()
     {
         if (enemyData == null) return;
 
