@@ -61,6 +61,8 @@ public class PlayerCombat : MonoBehaviour
         }
 
         AutoFindHierarchyWeapons();
+        if (customHandRifleModel != null) customHandRifleModel.SetActive(false);
+        if (customHandWeaponModel != null) customHandWeaponModel.SetActive(false);
     }
 
     void Start()
@@ -129,8 +131,9 @@ public class PlayerCombat : MonoBehaviour
             }
         }
 
-        // Sincronizar posición, rotación y escala del arma en tiempo real
-        if (currentEquippedModel != null && currentEquippedModel != customHandWeaponModel)
+        // Sincronizar posición, rotación y escala del arma en tiempo real SOLO para modelos instanciados por código
+        // NUNCA sobreescribir las armas manuales colocadas en la jerarquía (AK74 o Pistola)
+        if (currentEquippedModel != null && currentEquippedModel != customHandWeaponModel && currentEquippedModel != customHandRifleModel)
         {
             if (enableLiveTransformTuning)
             {
@@ -274,25 +277,23 @@ public class PlayerCombat : MonoBehaviour
     {
         AutoDetectRightHand();
 
-        Transform rootToSearch = handTransform != null ? handTransform : transform;
-
-        // Auto-descubrir Pistola en jerarquía si no está asignada
-        if (customHandWeaponModel == null)
+        // 1. Buscar Fusil AK47 / AK74 en toda la jerarquía del personaje (incluyendo objetos inactivos/ocultos)
+        if (customHandRifleModel == null)
         {
-            customHandWeaponModel = FindChildWithKeywords(rootToSearch, new string[] { "colt", "m1911", "pistol", "gun" });
-            if (customHandWeaponModel == null && handTransform != transform)
+            customHandRifleModel = FindChildWithKeywords(transform, new string[] { "ak74", "ak-74", "ak47", "ak-47", "ak", "rifle", "fusil", "m4", "kalashnikov" });
+            if (customHandRifleModel == null && handTransform != null && handTransform != transform)
             {
-                customHandWeaponModel = FindChildWithKeywords(transform, new string[] { "colt", "m1911", "pistol", "gun" });
+                customHandRifleModel = FindChildWithKeywords(handTransform, new string[] { "ak74", "ak-74", "ak47", "ak-47", "ak", "rifle", "fusil", "m4", "kalashnikov" });
             }
         }
 
-        // Auto-descubrir Fusil AK47 / AK74 en jerarquía si no está asignado
-        if (customHandRifleModel == null)
+        // 2. Buscar Pistola en toda la jerarquía
+        if (customHandWeaponModel == null)
         {
-            customHandRifleModel = FindChildWithKeywords(rootToSearch, new string[] { "ak74", "ak47", "ak-74", "ak-47", "rifle", "fusil", "m4" });
-            if (customHandRifleModel == null && handTransform != transform)
+            customHandWeaponModel = FindChildWithKeywords(transform, new string[] { "colt", "m1911", "1911", "pistol", "pistola", "gun", "handgun" });
+            if (customHandWeaponModel == null && handTransform != null && handTransform != transform)
             {
-                customHandRifleModel = FindChildWithKeywords(transform, new string[] { "ak74", "ak47", "ak-74", "ak-47", "rifle", "fusil", "m4" });
+                customHandWeaponModel = FindChildWithKeywords(handTransform, new string[] { "colt", "m1911", "1911", "pistol", "pistola", "gun", "handgun" });
             }
         }
     }
@@ -331,20 +332,8 @@ public class PlayerCombat : MonoBehaviour
             currentEquippedModel = null;
         }
 
-        // 2. Manejar modelos manuales en la mano según categoría
-        if (weapon.weaponCategory == WeaponType.Pistol)
-        {
-            if (customHandWeaponModel != null)
-            {
-                customHandWeaponModel.SetActive(true);
-                currentEquippedModel = customHandWeaponModel;
-            }
-            if (customHandRifleModel != null)
-            {
-                customHandRifleModel.SetActive(false);
-            }
-        }
-        else if (weapon.weaponCategory == WeaponType.Rifle)
+        // 2. Manejar modelos manuales en la jerarquía según categoría (conservando su posición y rotación original)
+        if (weapon.weaponCategory == WeaponType.Rifle)
         {
             if (customHandWeaponModel != null)
             {
@@ -354,6 +343,20 @@ public class PlayerCombat : MonoBehaviour
             {
                 customHandRifleModel.SetActive(true);
                 currentEquippedModel = customHandRifleModel;
+                // NOTA: NO instanciar ni sobreescribir transformaciones del AK manual
+            }
+        }
+        else if (weapon.weaponCategory == WeaponType.Pistol)
+        {
+            if (customHandRifleModel != null)
+            {
+                customHandRifleModel.SetActive(false);
+            }
+            if (customHandWeaponModel != null)
+            {
+                customHandWeaponModel.SetActive(true);
+                currentEquippedModel = customHandWeaponModel;
+                // NOTA: NO instanciar ni sobreescribir transformaciones de la Pistola manual
             }
         }
         else
@@ -362,8 +365,8 @@ public class PlayerCombat : MonoBehaviour
             if (customHandRifleModel != null) customHandRifleModel.SetActive(false);
         }
 
-        // 3. Si no hay modelo manual configurado o detectado en la mano para esta categoría, instanciar el prefab del ScriptableObject
-        if (currentEquippedModel == null || (currentEquippedModel != customHandWeaponModel && currentEquippedModel != customHandRifleModel))
+        // 3. Si es un arma que NO tiene modelo en la jerarquía (ej. Arco o Espada), instanciar
+        if (currentEquippedModel == null && weapon.weaponCategory != WeaponType.Rifle && weapon.weaponCategory != WeaponType.Pistol)
         {
             GameObject prefabToSpawn = weapon.weaponModelPrefab != null ? weapon.weaponModelPrefab : weapon.itemPrefab;
             if (prefabToSpawn != null)
@@ -414,7 +417,7 @@ public class PlayerCombat : MonoBehaviour
 
     public void OnPerspectiveChanged(CameraPerspective perspective)
     {
-        if (currentEquippedModel != null && currentWeapon != null && !enableLiveTransformTuning)
+        if (currentEquippedModel != null && currentEquippedModel != customHandWeaponModel && currentEquippedModel != customHandRifleModel && currentWeapon != null && !enableLiveTransformTuning)
         {
             currentEquippedModel.transform.localPosition = currentWeapon.weaponEquipOffset;
             currentEquippedModel.transform.localEulerAngles = currentWeapon.weaponEquipRotation;
