@@ -115,21 +115,51 @@ public class RuntimeGameSetup : MonoBehaviour
 
     private static void EnsureMerchantNPC()
     {
-        if (FindAnyObjectByType<MerchantNPC>() != null) return;
-
-        // Buscar modelo del mercader
-        GameObject merchantModel = Resources.Load<GameObject>("Merchant");
-        if (merchantModel == null)
+        // Limpiar cualquier NPC placeholder o cilindro anterior
+        MerchantNPC[] existingNpcs = Object.FindObjectsByType<MerchantNPC>(FindObjectsSortMode.None);
+        foreach (var npc in existingNpcs)
         {
-            GameObject[] allFbx = Resources.FindObjectsOfTypeAll<GameObject>();
-            foreach (var go in allFbx)
+            if (npc != null)
             {
-                if (go != null && go.name.Equals("Merchant") && go.transform.root == go.transform)
+                MeshFilter mf = npc.GetComponent<MeshFilter>();
+                // Si es un cilindro primitivo o no tiene mallas hijas del mercader 3D
+                if ((mf != null && mf.sharedMesh != null && mf.sharedMesh.name.Contains("Cylinder")) || npc.transform.childCount <= 1)
                 {
-                    merchantModel = go;
-                    break;
+                    Object.DestroyImmediate(npc.gameObject);
+                }
+                else
+                {
+                    return; // Ya existe el modelo 3D real
                 }
             }
+        }
+
+        GameObject oldObj = GameObject.Find("Merchant_NPC");
+        if (oldObj != null)
+        {
+            MeshFilter mf = oldObj.GetComponent<MeshFilter>();
+            if (mf != null && mf.sharedMesh != null && mf.sharedMesh.name.Contains("Cylinder"))
+            {
+                Object.DestroyImmediate(oldObj);
+            }
+        }
+
+        // Buscar modelo 3D del mercader
+        GameObject merchantModel = null;
+#if UNITY_EDITOR
+        merchantModel = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/05_Models/Merchant.fbx");
+        if (merchantModel == null)
+        {
+            merchantModel = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Resources/Merchant.fbx");
+        }
+#endif
+        if (merchantModel == null)
+        {
+            merchantModel = Resources.Load<GameObject>("Merchant");
+        }
+        if (merchantModel == null)
+        {
+            merchantModel = Resources.Load<GameObject>("Merchant_NPC");
         }
 
         Vector3 spawnPos = new Vector3(4.5f, 0f, 4.5f);
@@ -156,21 +186,25 @@ public class RuntimeGameSetup : MonoBehaviour
             col = merchantObj.AddComponent<CapsuleCollider>();
             col.center = new Vector3(0, 0.9f, 0);
             col.height = 1.8f;
-            col.radius = 0.4f;
+            col.radius = 0.45f;
         }
 
-        MerchantNPC npc = merchantObj.GetComponent<MerchantNPC>();
-        if (npc == null) merchantObj.AddComponent<MerchantNPC>();
+        MerchantNPC merchantScript = merchantObj.GetComponent<MerchantNPC>();
+        if (merchantScript == null) merchantObj.AddComponent<MerchantNPC>();
 
         // Pequeña luz de ambiente cálida para el mercader
-        GameObject lightObj = new GameObject("Merchant_Light", typeof(Light));
-        lightObj.transform.SetParent(merchantObj.transform, false);
-        lightObj.transform.localPosition = new Vector3(0f, 2.2f, 0.5f);
-        Light l = lightObj.GetComponent<Light>();
-        l.type = LightType.Point;
-        l.color = new Color(1f, 0.75f, 0.35f);
-        l.range = 7f;
-        l.intensity = 2f;
+        Transform existingLight = merchantObj.transform.Find("Merchant_Light");
+        if (existingLight == null)
+        {
+            GameObject lightObj = new GameObject("Merchant_Light", typeof(Light));
+            lightObj.transform.SetParent(merchantObj.transform, false);
+            lightObj.transform.localPosition = new Vector3(0f, 2.2f, 0.5f);
+            Light l = lightObj.GetComponent<Light>();
+            l.type = LightType.Point;
+            l.color = new Color(1f, 0.82f, 0.45f);
+            l.range = 8f;
+            l.intensity = 2.5f;
+        }
     }
 
     private static void CreateRuntimeUI()
