@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PlayerHealth : MonoBehaviour, IDamageable
 {
@@ -45,17 +47,18 @@ public class PlayerHealth : MonoBehaviour, IDamageable
         Debug.Log($"[Jugador] Daño recibido: {amount}. Vida restante: {currentHealth}/{maxHealth}");
         OnHealthChanged?.Invoke(currentHealth, maxHealth);
 
-        // Disparar animación de impacto si el jugador sigue vivo y no está en forcejeo
-        PlayerController ctrl = GetComponent<PlayerController>();
-        Animator anim = GetComponentInChildren<Animator>();
-        if (anim != null && currentHealth > 0 && (ctrl == null || !ctrl.IsInGrappleQTE))
-        {
-            anim.SetTrigger(HitHash);
-        }
-
         if (currentHealth <= 0)
         {
             Die();
+            return;
+        }
+
+        // Disparar animación de impacto solo si sigue con vida
+        PlayerController ctrl = GetComponent<PlayerController>();
+        Animator anim = GetComponentInChildren<Animator>();
+        if (anim != null && (ctrl == null || !ctrl.IsInGrappleQTE))
+        {
+            anim.SetTrigger(HitHash);
         }
     }
 
@@ -73,12 +76,13 @@ public class PlayerHealth : MonoBehaviour, IDamageable
     {
         if (isDead) return;
         isDead = true;
-        Debug.LogWarning("[Jugador] Ha muerto.");
+        Debug.LogWarning("[Jugador] Ha muerto. Ejecutando animación de muerte...");
 
         PlayerController ctrl = GetComponent<PlayerController>();
         if (ctrl != null)
         {
             ctrl.CanMove = false;
+            ctrl.enabled = false;
         }
 
         PlayerCombat combat = GetComponent<PlayerCombat>();
@@ -87,19 +91,49 @@ public class PlayerHealth : MonoBehaviour, IDamageable
             combat.enabled = false;
         }
 
+        CharacterController cc = GetComponent<CharacterController>();
+        if (cc != null)
+        {
+            cc.enabled = false;
+        }
+
         Animator anim = GetComponentInChildren<Animator>();
         if (anim != null)
         {
+            anim.ResetTrigger(HitHash);
+            anim.ResetTrigger(Animator.StringToHash("Shoot"));
+            anim.ResetTrigger(Animator.StringToHash("Reload"));
+            anim.SetBool(Animator.StringToHash("Struggle"), false);
+            anim.SetBool(Animator.StringToHash("isMoving"), false);
+            anim.SetFloat(Animator.StringToHash("Speed"), 0f);
             anim.SetTrigger(DieHash);
+            anim.CrossFade("Player_Die", 0.08f, 0, 0f);
         }
 
         HUDUI hud = FindAnyObjectByType<HUDUI>();
         if (hud != null)
         {
-            hud.ShowNotification("☠ ¡HAS MUERTO! Presiona Reiniciar");
+            hud.ShowNotification("☠ ¡HAS MUERTO! Reiniciando partida...");
         }
 
         OnPlayerDied?.Invoke();
+
+        StartCoroutine(RestartSceneAfterDeathRoutine());
+    }
+
+    private IEnumerator RestartSceneAfterDeathRoutine()
+    {
+        // Esperar a que la animación de muerte termine de reproducirse completamente
+        yield return new WaitForSeconds(3.8f);
+
+        // Resetear inventario si existe para arrancar desde cero
+        if (Inventory.Instance != null)
+        {
+            Inventory.Instance.ClearInventory();
+        }
+
+        Scene currentScene = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(currentScene.buildIndex);
     }
 
     public void Respawn()
