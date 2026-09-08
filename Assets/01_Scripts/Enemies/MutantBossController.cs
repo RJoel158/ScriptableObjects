@@ -97,7 +97,7 @@ public class MutantBossController : EnemyController
     protected override void Awake()
     {
         base.Awake();
-        heightOffset = (enemyData != null && enemyData.groundYOffset > 0f) ? enemyData.groundYOffset : 0.65f;
+        heightOffset = 0f;
         if (leftBigSpike == null || rightBigSpike == null || animator == null)
         {
             AutoBindComponentsAndSpikePoints();
@@ -146,10 +146,10 @@ public class MutantBossController : EnemyController
             }
         }
 
-        // Mantener altura sobre el suelo
-        float baseOffset = (enemyData != null) ? enemyData.groundYOffset : 0.65f;
+        // Mantener altura firme sobre el nivel del suelo (y = 0)
+        float targetY = (enemyData != null) ? enemyData.groundYOffset : 0f;
         Vector3 currentPos = transform.position;
-        currentPos.y = baseOffset + heightOffset;
+        currentPos.y = targetY + heightOffset;
 
         float distanceToPlayer = Vector3.Distance(currentPos, targetPlayer.position);
         Vector3 dirToPlayer = (targetPlayer.position - currentPos).normalized;
@@ -310,7 +310,7 @@ public class MutantBossController : EnemyController
 
         // Desplazamiento en el aire hacia la posición del jugador
         Vector3 jumpTarget = targetPlayer != null ? targetPlayer.position : transform.position;
-        jumpTarget.y = (enemyData != null ? enemyData.groundYOffset : 0.65f) + heightOffset;
+        jumpTarget.y = (enemyData != null ? enemyData.groundYOffset : 0f) + heightOffset;
         Vector3 startPos = transform.position;
         float elapsed = 0f;
         float jumpDuration = 0.45f;

@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.IO;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -8,6 +9,7 @@ public static class MutantBossAnimatorSetup
 {
     private const string ControllerPath = "Assets/MonsterMutant 7/MonsterMutant7 Animator Controller.controller";
     private const string AnimFolder = "Assets/MonsterMutant 7/Animations/";
+    private const string BaseMeshPath = "Assets/MonsterMutant 7/Base mesh/Base mesh MonsterMutant7.fbx";
 
     static MutantBossAnimatorSetup()
     {
@@ -17,11 +19,78 @@ public static class MutantBossAnimatorSetup
         };
     }
 
-    [MenuItem("RPG Survival/👹 Configurar Animator del Jefe Mutante", false, 40)]
-    public static void ManualSetup()
+    [MenuItem("RPG Survival/👹 Configurar Todo (FBX Humanoid + Animator + Prefab)", false, 39)]
+    public static void FullBossSetup()
     {
+        ConfigureFBXAnimations();
         SetupBossAnimator(true);
         AutoBakeMutantBossPrefab(true);
+    }
+
+    [MenuItem("RPG Survival/🦴 Reimportar y Calibrar FBX del Mutante (Humanoid + Loop)", false, 40)]
+    public static void ConfigureFBXAnimations()
+    {
+        Avatar baseAvatar = AssetDatabase.LoadAssetAtPath<Avatar>(BaseMeshPath);
+
+        if (!Directory.Exists(AnimFolder)) return;
+
+        string[] fbxFiles = Directory.GetFiles(AnimFolder, "*.fbx", SearchOption.TopDirectoryOnly);
+        int modifiedCount = 0;
+
+        foreach (string fbxFile in fbxFiles)
+        {
+            string unityPath = fbxFile.Replace('\\', '/');
+            ModelImporter importer = AssetImporter.GetAtPath(unityPath) as ModelImporter;
+            if (importer == null) continue;
+
+            bool changed = false;
+
+            if (importer.animationType != ModelImporterAnimationType.Humanoid)
+            {
+                importer.animationType = ModelImporterAnimationType.Humanoid;
+                importer.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
+                if (baseAvatar != null)
+                {
+                    importer.sourceAvatar = baseAvatar;
+                }
+                changed = true;
+            }
+
+            ModelImporterClipAnimation[] clips = importer.defaultClipAnimations;
+            if (clips == null || clips.Length == 0)
+            {
+                clips = importer.clipAnimations;
+            }
+
+            if (clips != null && clips.Length > 0)
+            {
+                string lowerName = Path.GetFileNameWithoutExtension(unityPath).ToLower();
+                bool isLoop = lowerName.Contains("idle") || lowerName.Contains("walk") || lowerName.Contains("run") || lowerName.Contains("strafe");
+
+                foreach (var clip in clips)
+                {
+                    clip.loopTime = isLoop;
+                    clip.loopPose = isLoop;
+                    clip.lockRootHeightY = true;
+                    clip.lockRootPositionXZ = true;
+                    clip.lockRootRotation = true;
+                    clip.keepOriginalOrientation = true;
+                    clip.keepOriginalPositionY = false;
+                    clip.keepOriginalPositionXZ = true;
+                    clip.heightFromFeet = false;
+                }
+                importer.clipAnimations = clips;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                importer.SaveAndReimport();
+                modifiedCount++;
+            }
+        }
+
+        Debug.Log($"[MutantBossAnimatorSetup] Se calibraron {modifiedCount} FBX con Avatar Humanoid y Loop Pose.");
     }
 
     [MenuItem("RPG Survival/⚙️ Pre-Vincular Puntos de Espinas y Animator en Prefab", false, 41)]

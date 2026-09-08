@@ -229,7 +229,7 @@ public class WaveManager : MonoBehaviour
 
     public void SpawnBoss(float healthMult, float damageMult, float speedMult)
     {
-        Vector3 spawnPos = GetSpawnPosition(0, 1, (bossEnemyData != null) ? bossEnemyData.groundYOffset : 0.65f);
+        Vector3 spawnPos = GetSpawnPosition(0, 1, (bossEnemyData != null) ? bossEnemyData.groundYOffset : 0f);
         GameObject bossObj = null;
 
         if (bossPrefab != null)
