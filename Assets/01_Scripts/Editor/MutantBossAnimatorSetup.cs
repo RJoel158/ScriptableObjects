@@ -45,9 +45,9 @@ public static class MutantBossAnimatorSetup
 
             bool changed = false;
 
-            if (importer.animationType != ModelImporterAnimationType.Humanoid)
+            if (importer.animationType != ModelImporterAnimationType.Human)
             {
-                importer.animationType = ModelImporterAnimationType.Humanoid;
+                importer.animationType = ModelImporterAnimationType.Human;
                 importer.avatarSetup = ModelImporterAvatarSetup.CopyFromOther;
                 if (baseAvatar != null)
                 {
